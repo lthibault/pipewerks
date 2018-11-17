@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/SentimensRG/ctx/mergectx"
-	net "github.com/lthibault/pipewerks/pkg"
+	net "github.com/lthibault/pipewerks/pkg/net"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -14,8 +14,8 @@ type Protocol interface {
 	StartOpening(left, right net.Conn) func() error
 }
 
-// BindConn ...
-func BindConn(p Protocol, left, right net.Conn) net.Joint {
+// Bind connections
+func Bind(p Protocol, left, right net.Conn) net.Joint {
 	c := mergectx.Link(left.Context(), right.Context())
 	g, c := errgroup.WithContext(c)
 	c, cancel := context.WithCancel(c)

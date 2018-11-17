@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/SentimensRG/ctx/mergectx"
-	net "github.com/lthibault/pipewerks/pkg"
+	net "github.com/lthibault/pipewerks/pkg/net"
 	"golang.org/x/sync/errgroup"
 )
 
