@@ -53,7 +53,6 @@ type EndpointPair interface {
 
 // Stream is a bidirectional connection between two hosts
 type Stream interface {
-	Path() string
 	Context() context.Context
 	Endpoint() EndpointPair
 	Close() error
