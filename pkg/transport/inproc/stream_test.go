@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var addrs = ep{local: Addr("/local"), remote: Addr("/remote")}
+var addrs = edge{local: Addr("/local"), remote: Addr("/remote")}
 
 func TestStream(t *testing.T) {
 	p := newStreamPair(context.Background(), addrs)
