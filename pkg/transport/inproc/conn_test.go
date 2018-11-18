@@ -44,6 +44,22 @@ func TestConnPair(t *testing.T) {
 }
 
 func TestConn(t *testing.T) {
+	t.Run("Close", func(t *testing.T) {
+		t.Run("Local", func(t *testing.T) {
+			p := newConnPair(context.Background(), local, remote)
+			lc := p.Local()
+			// rc := p.Remote()
+			assert.NoError(t, lc.Close())
+		})
+
+		t.Run("Remote", func(t *testing.T) {
+			p := newConnPair(context.Background(), local, remote)
+			// lc := p.Local()
+			rc := p.Remote()
+			assert.NoError(t, rc.Close())
+		})
+	})
+
 	t.Run("CloseWithError", func(t *testing.T) {
 		t.Run("Local", func(t *testing.T) {
 			p := newConnPair(context.Background(), local, remote)
