@@ -59,10 +59,9 @@ func (r *radixMux) DelListener(path string) (l Listener, ok bool) {
 }
 
 func (r *radixMux) Connect(c context.Context, conn net.Conn) (err error) {
-	r.RLock()
-	l, ok := r.GetListener(conn.Endpoint().Local().String())
 
-	if ok {
+	r.RLock()
+	if l, ok := r.GetListener(conn.Endpoint().Local().String()); ok {
 		err = errors.New("connection refused")
 	} else {
 		select {
@@ -71,7 +70,7 @@ func (r *radixMux) Connect(c context.Context, conn net.Conn) (err error) {
 			err = c.Err()
 		}
 	}
-
 	r.RUnlock()
+
 	return
 }
