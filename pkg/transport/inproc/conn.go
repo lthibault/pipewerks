@@ -24,7 +24,7 @@ type connPair struct {
 	c      context.Context
 	cancel func()
 
-	ep       net.Edge
+	edg      net.Edge
 	l2r, r2l chan net.Stream
 
 	local, remote goconn
@@ -33,7 +33,7 @@ type connPair struct {
 func newConnPair(c context.Context, local, remote net.Addr) (p *connPair) {
 	p = new(connPair)
 	p.c, p.cancel = context.WithCancel(c)
-	p.ep = ep{local: local, remote: remote}
+	p.edg = edge{local: local, remote: remote}
 	p.l2r = make(chan net.Stream)
 	p.r2l = make(chan net.Stream)
 	p.local, p.remote = gonet.Pipe()
@@ -55,12 +55,12 @@ func (p *connPair) newConn(remote bool) conn {
 	var in = p.r2l
 	var out = p.l2r
 	var cxn = p.local
-	var edg = p.ep
+	var edg = p.edg
 
 	if remote {
 		cxn = p.remote
 		in, out = out, in
-		edg = ep{local: edg.Remote(), remote: edg.Local()}
+		edg = edge{local: edg.Remote(), remote: edg.Local()}
 	}
 
 	return conn{
@@ -68,7 +68,7 @@ func (p *connPair) newConn(remote bool) conn {
 		cancel: p.cancel,
 		in:     in,
 		out:    out,
-		ep:     edg,
+		edg:    edg,
 		goconn: cxn,
 	}
 }
@@ -77,14 +77,14 @@ type conn struct {
 	c      context.Context
 	cancel func()
 
-	ep      net.Edge
+	edg     net.Edge
 	in, out chan net.Stream
 
 	goconn
 }
 
 func (c conn) Context() context.Context { return c.c }
-func (c conn) Endpoint() net.Edge       { return c.ep }
+func (c conn) Endpoint() net.Edge       { return c.edg }
 func (c conn) Stream() net.Streamer     { return c }
 
 func (c conn) Close() error {
@@ -93,7 +93,7 @@ func (c conn) Close() error {
 }
 
 func (c conn) Open() (s net.Stream, err error) {
-	sp := newStreamPair(c.c, c.ep)
+	sp := newStreamPair(c.c, c.edg)
 	select {
 	case c.out <- sp.Remote():
 		s = sp.Local()

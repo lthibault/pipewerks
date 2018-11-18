@@ -21,10 +21,10 @@ type NameSpace interface {
 	Connect(context.Context, net.Conn) error
 }
 
-type ep struct{ local, remote net.Addr }
+type edge struct{ local, remote net.Addr }
 
-func (ep ep) Local() net.Addr  { return ep.local }
-func (ep ep) Remote() net.Addr { return ep.remote }
+func (e edge) Local() net.Addr  { return e.local }
+func (e edge) Remote() net.Addr { return e.remote }
 
 // Transport bytes around the process
 type Transport struct {
