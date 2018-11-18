@@ -20,9 +20,6 @@ type Error interface {
 	Temporary() bool // Is the error temporary?
 }
 
-// ErrorCode is used to terminate a connection and signal an error
-type ErrorCode uint16
-
 // Transport is a means by which to connect to an listen for connections from
 // other peers.
 type Transport interface {
@@ -44,7 +41,6 @@ type Conn interface {
 	Stream() Streamer
 	Endpoint() Edge
 	Close() error
-	CloseWithError(ErrorCode, error) error
 }
 
 // Streamer can open and close various types of streams

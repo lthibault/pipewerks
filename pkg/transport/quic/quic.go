@@ -53,10 +53,6 @@ func (conn *conn) Endpoint() net.Edge { return conn }
 func (conn conn) Local() net.Addr     { return conn.LocalAddr() }
 func (conn conn) Remote() net.Addr    { return conn.RemoteAddr() }
 
-func (conn conn) CloseWithError(c net.ErrorCode, err error) error {
-	return conn.Session.CloseWithError(quic.ErrorCode(c), err)
-}
-
 type stream struct {
 	path string
 	quic.Stream
