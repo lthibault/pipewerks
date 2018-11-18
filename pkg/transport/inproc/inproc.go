@@ -17,8 +17,8 @@ func (a Addr) String() string { return string(a) }
 
 // NameSpace is an isolated set of connections
 type NameSpace interface {
-	SetListener(Listener) (prev Listener, overwritten bool)
-	Serve(context.Context, net.Conn) error
+	Bind(Listener) (prev Listener, overwritten bool)
+	Connect(context.Context, net.Conn) error
 }
 
 type ep struct{ local, remote net.Addr }
@@ -44,8 +44,8 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) 
 
 	l := Listener{a: Addr(a.String()), ch: make(chan net.Conn)}
 
-	if prev, exists := t.ns.SetListener(l); exists {
-		t.ns.SetListener(prev)
+	if prev, exists := t.ns.Bind(l); exists {
+		t.ns.Bind(prev)
 		return nil, errors.New("address in use")
 	}
 
@@ -63,7 +63,7 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (conn net.Conn, err erro
 	}
 
 	cp := newConnPair(c, t.dialback, a)
-	return cp.Local(), t.ns.Serve(c, cp.Remote())
+	return cp.Local(), t.ns.Connect(c, cp.Remote())
 }
 
 // New in-process Transport

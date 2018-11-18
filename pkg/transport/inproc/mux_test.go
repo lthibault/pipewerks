@@ -22,12 +22,12 @@ func TestMux(t *testing.T) {
 
 		t.Run("Store", func(t *testing.T) {
 			t.Run("New", func(t *testing.T) {
-				v, replace := m.SetListener(l)
+				v, replace := m.Bind(l)
 				assert.False(t, replace, "unexpected %v (type %T)", v, v)
 			})
 
 			t.Run("Replace", func(t *testing.T) {
-				ln, replace := m.SetListener(Listener{a: Addr(ListenerPath)})
+				ln, replace := m.Bind(Listener{a: Addr(ListenerPath)})
 				assert.True(t, replace, "no replacee or replacement not reported")
 				assert.Equal(t, l, ln, "unexpected replacee")
 				l = ln // put it back so we can continue testing

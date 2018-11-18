@@ -124,7 +124,7 @@ func (r *radixMux) GetStream(lpath, cpath, spath string) (c streamNode, ok bool)
 	return
 }
 
-func (r *radixMux) SetListener(l Listener) (ln Listener, ok bool) {
+func (r *radixMux) Bind(l Listener) (ln Listener, ok bool) {
 	r.Lock()
 	n := listenNode{r: r, Listener: l}
 	var v interface{}
@@ -187,7 +187,7 @@ func (r *radixMux) DelStream(lpath, cpath, spath string) (c streamNode, ok bool)
 	return
 }
 
-func (r *radixMux) Serve(c context.Context, conn net.Conn) (err error) {
+func (r *radixMux) Connect(c context.Context, conn net.Conn) (err error) {
 	r.RLock()
 	l, ok := r.GetListener(conn.Endpoint().Local().String())
 	r.RUnlock()
