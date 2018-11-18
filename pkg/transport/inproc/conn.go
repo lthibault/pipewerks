@@ -41,7 +41,8 @@ type connPair struct {
 	c      context.Context
 	cancel func()
 
-	ep net.Edge
+	ep       net.Edge
+	l2r, r2l chan net.Stream
 
 	local, remote goconn
 	lae, rae      atomicErr
@@ -51,6 +52,8 @@ func newConnPair(c context.Context, local, remote net.Addr) (p *connPair) {
 	p = new(connPair)
 	p.c, p.cancel = context.WithCancel(c)
 	p.ep = ep{local: local, remote: remote}
+	p.l2r = make(chan net.Stream)
+	p.r2l = make(chan net.Stream)
 	p.local, p.remote = gonet.Pipe()
 	return
 }
@@ -67,6 +70,8 @@ func (p *connPair) Local() net.Conn  { return p.newConn(false) }
 func (p *connPair) Remote() net.Conn { return p.newConn(true) }
 
 func (p *connPair) newConn(remote bool) conn {
+	var in = p.r2l
+	var out = p.l2r
 	var cxn = p.local
 	var lae = &p.lae
 	var rae = &p.rae
@@ -74,6 +79,7 @@ func (p *connPair) newConn(remote bool) conn {
 
 	if remote {
 		cxn = p.remote
+		in, out = out, in
 		lae, rae = rae, lae
 		edg = ep{local: edg.Remote(), remote: edg.Local()}
 	}
@@ -81,8 +87,8 @@ func (p *connPair) newConn(remote bool) conn {
 	return conn{
 		c:      p.c,
 		cancel: p.cancel,
-		in:     make(chan net.Stream),
-		out:    make(chan net.Stream),
+		in:     in,
+		out:    out,
 		ep:     edg,
 		lae:    lae,
 		rae:    rae,

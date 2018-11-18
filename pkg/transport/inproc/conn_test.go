@@ -1,7 +1,9 @@
 package inproc
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -124,5 +126,32 @@ func TestConn(t *testing.T) {
 				})
 			})
 		})
+	})
+
+	t.Run("Stream", func(t *testing.T) {
+		t.Parallel()
+
+		p := newConnPair(context.Background(), local, remote)
+
+		t.Run("Open", func(t *testing.T) {
+			lc := p.Local()
+			s, err := lc.Stream().Open()
+			assert.NoError(t, err)
+
+			_, err = io.Copy(s, bytes.NewBuffer([]byte("testing")))
+			assert.NoError(t, err)
+		})
+
+		t.Run("Accept", func(t *testing.T) {
+			rc := p.Remote()
+			s, err := rc.Stream().Accept()
+			assert.NoError(t, err)
+
+			b := new(bytes.Buffer)
+			_, err = io.Copy(b, s)
+			assert.NoError(t, err)
+			assert.Equal(t, "testing", b.String())
+		})
+
 	})
 }
