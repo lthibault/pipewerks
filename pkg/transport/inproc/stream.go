@@ -11,13 +11,13 @@ import (
 
 type streamPair struct {
 	c context.Context
-	net.EndpointPair
+	net.Edge
 	localConn, remoteConn gonet.Conn
 }
 
-func newStreampair(c context.Context, ep net.EndpointPair) (p streamPair) {
+func newStreampair(c context.Context, ep net.Edge) (p streamPair) {
 	p.c = c
-	p.EndpointPair = ep
+	p.Edge = ep
 	p.localConn, p.remoteConn = gonet.Pipe()
 	return
 }
@@ -31,25 +31,25 @@ func (p streamPair) Close() error {
 
 func (p streamPair) Local() net.Stream {
 	return stream{
-		c:            p.c,
-		EndpointPair: p.EndpointPair,
-		Conn:         p.localConn,
+		c:    p.c,
+		Edge: p.Edge,
+		Conn: p.localConn,
 	}
 }
 
 func (p streamPair) Remote() net.Stream {
 	return stream{
-		c:            p.c,
-		EndpointPair: p.EndpointPair,
-		Conn:         p.remoteConn,
+		c:    p.c,
+		Edge: p.Edge,
+		Conn: p.remoteConn,
 	}
 }
 
 type stream struct {
 	c context.Context
-	net.EndpointPair
+	net.Edge
 	gonet.Conn
 }
 
-func (s stream) Context() context.Context   { return s.c }
-func (s stream) Endpoint() net.EndpointPair { return s }
+func (s stream) Context() context.Context { return s.c }
+func (s stream) Endpoint() net.Edge       { return s }

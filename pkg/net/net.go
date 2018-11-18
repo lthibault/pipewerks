@@ -2,14 +2,22 @@ package net
 
 import (
 	"context"
+	"net"
 	"time"
 )
 
-// Joint between two Pipes.  Break will stop the participating Pipes.  Wait
-// blocks until the Joint is broken.
-type Joint struct {
-	Break func()
-	Wait  func() error
+// Addr represents a network end point address.
+//
+// The two methods Network and String conventionally return strings
+// that can be passed as the arguments to Dial, but the exact form
+// and meaning of the strings is up to the implementation.
+type Addr = net.Addr
+
+// An Error represents a network error.
+type Error interface {
+	error
+	Timeout() bool   // Is the error a timeout?
+	Temporary() bool // Is the error temporary?
 }
 
 // ErrorCode is used to terminate a connection and signal an error
@@ -34,7 +42,7 @@ type Listener interface {
 type Conn interface {
 	Context() context.Context
 	Stream() Streamer
-	Endpoint() EndpointPair
+	Endpoint() Edge
 	Close() error
 	CloseWithError(ErrorCode, error) error
 }
@@ -45,8 +53,8 @@ type Streamer interface {
 	Open() (Stream, error)
 }
 
-// EndpointPair identifies the two endpoints
-type EndpointPair interface {
+// Edge identifies a connection between to endpoints
+type Edge interface {
 	Local() Addr
 	Remote() Addr
 }
@@ -54,7 +62,7 @@ type EndpointPair interface {
 // Stream is a bidirectional connection between two hosts
 type Stream interface {
 	Context() context.Context
-	Endpoint() EndpointPair
+	Endpoint() Edge
 	Close() error
 	Read(b []byte) (n int, err error)
 	Write(b []byte) (n int, err error)

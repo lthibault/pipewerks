@@ -44,15 +44,15 @@ func (conn conn) Open() (net.Stream, error) {
 	}
 
 	return &stream{
-		path:         string(path),
-		Stream:       s,
-		EndpointPair: conn,
+		path:   string(path),
+		Stream: s,
+		Edge:   conn,
 	}, nil
 }
 
-func (conn *conn) Endpoint() net.EndpointPair { return conn }
-func (conn conn) Local() net.Addr             { return conn.LocalAddr() }
-func (conn conn) Remote() net.Addr            { return conn.RemoteAddr() }
+func (conn *conn) Endpoint() net.Edge { return conn }
+func (conn conn) Local() net.Addr     { return conn.LocalAddr() }
+func (conn conn) Remote() net.Addr    { return conn.RemoteAddr() }
 
 func (conn conn) CloseWithError(c net.ErrorCode, err error) error {
 	return conn.Session.CloseWithError(quic.ErrorCode(c), err)
@@ -61,11 +61,11 @@ func (conn conn) CloseWithError(c net.ErrorCode, err error) error {
 type stream struct {
 	path string
 	quic.Stream
-	net.EndpointPair
+	net.Edge
 }
 
-func (s stream) Path() string               { return s.path }
-func (s stream) Endpoint() net.EndpointPair { return s.EndpointPair }
+func (s stream) Path() string       { return s.path }
+func (s stream) Endpoint() net.Edge { return s.Edge }
 
 // Transport over QUIC
 type Transport struct {

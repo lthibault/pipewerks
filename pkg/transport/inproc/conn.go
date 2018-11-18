@@ -37,7 +37,7 @@ type connPair struct {
 	c      context.Context
 	cancel func()
 
-	ep net.EndpointPair
+	ep net.Edge
 
 	local, remote goconn
 	lerr, rerr    atomicErr
@@ -79,16 +79,16 @@ type conn struct {
 	c      context.Context
 	cancel func()
 
-	ep      net.EndpointPair
+	ep      net.Edge
 	in, out chan net.Stream
 
 	lerr, rerr *atomicErr
 	goconn
 }
 
-func (c conn) Context() context.Context   { return c.c }
-func (c conn) Endpoint() net.EndpointPair { return c.ep }
-func (c conn) Stream() net.Streamer       { return c }
+func (c conn) Context() context.Context { return c.c }
+func (c conn) Endpoint() net.Edge       { return c.ep }
+func (c conn) Stream() net.Streamer     { return c }
 
 func (c conn) Close() error { return c.CloseWithError(0, nil) }
 
