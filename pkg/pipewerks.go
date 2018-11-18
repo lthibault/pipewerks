@@ -7,22 +7,6 @@ import (
 	net "github.com/lthibault/pipewerks/pkg/net"
 )
 
-// Dialer can dial a specific address
-type Dialer interface {
-	Dial(context.Context, net.Addr) (net.Conn, error)
-}
-
-// NewDialer for a transport
-func NewDialer(t net.Transport) Dialer { return dialListener{t} }
-
-// Listener can listen at a specific address
-type Listener interface {
-	Listen(context.Context, net.Addr) (net.Listener, error)
-}
-
-// NewListener for a transport
-func NewListener(t net.Transport) Listener { return dialListener{t} }
-
 // Client is a Dialer that knows where to dial
 type Client interface {
 	Addr() net.Addr
