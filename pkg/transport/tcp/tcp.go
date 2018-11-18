@@ -8,9 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Option for TCP
-type Option = generic.Option
-
 // Transport over TCP
 type Transport struct{ *generic.Transport }
 
@@ -34,6 +31,8 @@ func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
 
 // New TCP Transport
 func New(opt ...Option) (t Transport) {
-	t.Transport = generic.New(opt...)
+	for _, fn := range opt {
+		fn(t.Transport)
+	}
 	return t
 }
