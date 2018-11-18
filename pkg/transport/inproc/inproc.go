@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	net "github.com/lthibault/pipewerks/pkg/net"
-	"github.com/satori/uuid"
 )
 
 // Addr for inproc transport
@@ -52,8 +51,9 @@ func (l listener) Accept(c context.Context) (net.Conn, error) {
 
 // Transport bytes around the process
 type Transport struct {
-	mu  sync.RWMutex
-	mux radixMux
+	mu       sync.RWMutex
+	mux      radixMux
+	dialback Addr
 }
 
 // Listen for incoming connections
@@ -85,7 +85,7 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (conn net.Conn, err erro
 		return
 	}
 
-	cp := newConnPair(c, Addr(uuid.NewV4().String()), a)
+	cp := newConnPair(c, t.dialback, a)
 	return cp.Local(), t.mux.ServeConn(c, cp.Remote())
 }
 
@@ -93,6 +93,9 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (conn net.Conn, err erro
 func New(opt ...Option) *Transport {
 	t := new(Transport)
 	t.mux = newMux()
+
+	OptDialback("anonymous")(t)
+
 	for _, o := range opt {
 		o(t)
 	}
