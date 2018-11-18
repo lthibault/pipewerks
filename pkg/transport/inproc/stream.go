@@ -40,7 +40,7 @@ func (p streamPair) Local() net.Stream {
 func (p streamPair) Remote() net.Stream {
 	return stream{
 		c:    p.c,
-		Edge: p.Edge,
+		Edge: ep{local: p.Edge.Remote(), remote: p.Edge.Local()},
 		Conn: p.remoteConn,
 	}
 }
