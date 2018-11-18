@@ -2,12 +2,13 @@ package inproc
 
 import (
 	"context"
-	"errors"
 	"io"
 	gonet "net"
 	"sync/atomic"
 	"time"
 	"unsafe"
+
+	"github.com/pkg/errors"
 
 	"github.com/lthibault/pipewerks/pkg/net"
 	"golang.org/x/sync/errgroup"
@@ -133,7 +134,7 @@ func (c conn) Open() (s net.Stream, err error) {
 		s = sp.Local()
 	case <-c.c.Done():
 		if err = c.lae.Load(); err == nil {
-			err = c.c.Err()
+			err = errors.Wrap(c.c.Err(), "closed")
 		}
 	}
 	return
@@ -148,7 +149,7 @@ func (c conn) Accept() (s net.Stream, err error) {
 		}
 	case <-c.c.Done():
 		if err = c.lae.Load(); err == nil {
-			err = c.c.Err()
+			err = errors.Wrap(c.c.Err(), "closed")
 		}
 	}
 	return

@@ -2,8 +2,9 @@ package inproc
 
 import (
 	"context"
-	"errors"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -38,6 +39,74 @@ func TestConnPair(t *testing.T) {
 		t.Run("Remote", func(t *testing.T) {
 			assert.Equal(t, local, p.Remote().Endpoint().Remote())
 			assert.Equal(t, remote, p.Remote().Endpoint().Local())
+		})
+	})
+}
+
+func TestConn(t *testing.T) {
+	t.Run("CloseWithError", func(t *testing.T) {
+		t.Run("Local", func(t *testing.T) {
+			p := newConnPair(context.Background(), local, remote)
+			lc := p.Local()
+			rc := p.Remote()
+
+			assert.NoError(t, lc.CloseWithError(0, errors.New("close local")))
+
+			t.Run("Open", func(t *testing.T) {
+				t.Run("Local", func(t *testing.T) {
+					_, err := lc.Stream().Open()
+					assert.EqualError(t, err, "closed: context canceled")
+				})
+
+				t.Run("Remote", func(t *testing.T) {
+					_, err := rc.Stream().Open()
+					assert.EqualError(t, err, "close local")
+				})
+			})
+
+			t.Run("Accept", func(t *testing.T) {
+				t.Run("Local", func(t *testing.T) {
+					_, err := lc.Stream().Accept()
+					assert.EqualError(t, err, "closed: context canceled")
+				})
+
+				t.Run("Remote", func(t *testing.T) {
+					_, err := rc.Stream().Accept()
+					assert.EqualError(t, err, "close local")
+				})
+			})
+		})
+
+		t.Run("Remote", func(t *testing.T) {
+			p := newConnPair(context.Background(), local, remote)
+			lc := p.Local()
+			rc := p.Remote()
+
+			assert.NoError(t, rc.CloseWithError(0, errors.New("close remote")))
+
+			t.Run("Open", func(t *testing.T) {
+				t.Run("Local", func(t *testing.T) {
+					_, err := lc.Stream().Open()
+					assert.EqualError(t, err, "close remote")
+				})
+
+				t.Run("Remote", func(t *testing.T) {
+					_, err := rc.Stream().Open()
+					assert.EqualError(t, err, "closed: context canceled")
+				})
+			})
+
+			t.Run("Accept", func(t *testing.T) {
+				t.Run("Local", func(t *testing.T) {
+					_, err := lc.Stream().Accept()
+					assert.EqualError(t, err, "close remote")
+				})
+
+				t.Run("Remote", func(t *testing.T) {
+					_, err := rc.Stream().Accept()
+					assert.EqualError(t, err, "closed: context canceled")
+				})
+			})
 		})
 	})
 }
