@@ -15,7 +15,7 @@ type streamPair struct {
 	localConn, remoteConn gonet.Conn
 }
 
-func newStreampair(c context.Context, ep net.Edge) (p streamPair) {
+func newStreamPair(c context.Context, ep net.Edge) (p streamPair) {
 	p.c = c
 	p.Edge = ep
 	p.localConn, p.remoteConn = gonet.Pipe()

@@ -113,7 +113,7 @@ func (c conn) CloseWithError(_ net.ErrorCode, err error) error {
 }
 
 func (c conn) Open() (s net.Stream, err error) {
-	sp := newStreampair(c.c, c.ep)
+	sp := newStreamPair(c.c, c.ep)
 	select {
 	case c.out <- sp.Remote():
 		s = sp.Local()
