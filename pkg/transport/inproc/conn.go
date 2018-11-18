@@ -18,7 +18,10 @@ type atomicErr atomic.Value
 func newAtomicErr() *atomicErr { return (*atomicErr)(new(atomic.Value)) }
 
 func (e *atomicErr) Load() (err error) {
-	return (*atomic.Value)(unsafe.Pointer(e)).Load().(error)
+	if v := (*atomic.Value)(unsafe.Pointer(e)).Load(); v != nil {
+		err = v.(error)
+	}
+	return
 }
 
 func (e *atomicErr) Store(err error) {
@@ -40,7 +43,7 @@ type connPair struct {
 	ep net.Edge
 
 	local, remote goconn
-	lerr, rerr    atomicErr
+	lae, rae      atomicErr
 }
 
 func newConnPair(c context.Context, local, remote net.Addr) (p *connPair) {
@@ -59,18 +62,18 @@ func (p *connPair) Close() error {
 	return g.Wait()
 }
 
-func (p *connPair) Local() net.Conn  { return p.newConn(p.local, &p.lerr, &p.rerr) }
-func (p *connPair) Remote() net.Conn { return p.newConn(p.remote, &p.rerr, &p.lerr) }
+func (p *connPair) Local() net.Conn  { return p.newConn(p.local, &p.lae, &p.rae) }
+func (p *connPair) Remote() net.Conn { return p.newConn(p.remote, &p.rae, &p.lae) }
 
-func (p *connPair) newConn(cxn goconn, lerr, rerr *atomicErr) conn {
+func (p *connPair) newConn(cxn goconn, lae, rae *atomicErr) conn {
 	return conn{
 		c:      p.c,
 		cancel: p.cancel,
 		in:     make(chan net.Stream),
 		out:    make(chan net.Stream),
 		ep:     p.ep,
-		lerr:   lerr,
-		rerr:   rerr,
+		lae:    lae,
+		rae:    rae,
 		goconn: cxn,
 	}
 }
@@ -82,7 +85,7 @@ type conn struct {
 	ep      net.Edge
 	in, out chan net.Stream
 
-	lerr, rerr *atomicErr
+	lae, rae *atomicErr
 	goconn
 }
 
@@ -95,7 +98,7 @@ func (c conn) Close() error { return c.CloseWithError(0, nil) }
 func (c conn) CloseWithError(_ net.ErrorCode, err error) error {
 	select {
 	case <-c.c.Done():
-		if err = c.lerr.Load(); err == nil {
+		if err = c.lae.Load(); err == nil {
 			err = c.c.Err()
 		}
 	default:
@@ -103,7 +106,7 @@ func (c conn) CloseWithError(_ net.ErrorCode, err error) error {
 			err = errors.New("closed")
 		}
 
-		c.rerr.Store(err)
+		c.rae.Store(err)
 		c.cancel()
 
 		err = c.goconn.Close()
@@ -118,7 +121,7 @@ func (c conn) Open() (s net.Stream, err error) {
 	case c.out <- sp.Remote():
 		s = sp.Local()
 	case <-c.c.Done():
-		if err = c.lerr.Load(); err == nil {
+		if err = c.lae.Load(); err == nil {
 			err = c.c.Err()
 		}
 	}
@@ -133,7 +136,7 @@ func (c conn) Accept() (s net.Stream, err error) {
 			err = errors.New("closed")
 		}
 	case <-c.c.Done():
-		if err = c.lerr.Load(); err == nil {
+		if err = c.lae.Load(); err == nil {
 			err = c.c.Err()
 		}
 	}
