@@ -59,13 +59,13 @@ type Edge interface {
 	Remote() Addr
 }
 
-// Stream is a bidirectional connection between two hosts
+// Stream is a bidirectional connection between two hosts.
 type Stream interface {
 	Context() context.Context
 	Endpoint() Edge
 	Close() error
-	Read(b []byte) (n int, err error)
-	Write(b []byte) (n int, err error)
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
 	SetDeadline(time.Time) error
 	SetReadDeadline(time.Time) error
 	SetWriteDeadline(time.Time) error
