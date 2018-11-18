@@ -62,16 +62,27 @@ func (p *connPair) Close() error {
 	return g.Wait()
 }
 
-func (p *connPair) Local() net.Conn  { return p.newConn(p.local, &p.lae, &p.rae) }
-func (p *connPair) Remote() net.Conn { return p.newConn(p.remote, &p.rae, &p.lae) }
+func (p *connPair) Local() net.Conn  { return p.newConn(false) }
+func (p *connPair) Remote() net.Conn { return p.newConn(true) }
 
-func (p *connPair) newConn(cxn goconn, lae, rae *atomicErr) conn {
+func (p *connPair) newConn(remote bool) conn {
+	var cxn = p.local
+	var lae = &p.lae
+	var rae = &p.rae
+	var edg = p.ep
+
+	if remote {
+		cxn = p.remote
+		lae, rae = rae, lae
+		edg = ep{local: edg.Remote(), remote: edg.Local()}
+	}
+
 	return conn{
 		c:      p.c,
 		cancel: p.cancel,
 		in:     make(chan net.Stream),
 		out:    make(chan net.Stream),
-		ep:     p.ep,
+		ep:     edg,
 		lae:    lae,
 		rae:    rae,
 		goconn: cxn,
