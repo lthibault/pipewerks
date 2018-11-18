@@ -9,10 +9,9 @@ import (
 
 	"github.com/SentimensRG/ctx"
 	log "github.com/lthibault/log/pkg"
-	net "github.com/lthibault/pipewerks/pkg"
+	net "github.com/lthibault/pipewerks/pkg/net"
 	quic "github.com/lucas-clemente/quic-go"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 )
 
 // Config for QUIC protocol
@@ -104,14 +103,19 @@ type listener struct{ quic.Listener }
 
 func (l listener) Accept(c context.Context) (conn net.Conn, err error) {
 	var sess quic.Session
+	ch := make(chan struct{})
 
-	var g errgroup.Group
-	g.Go(func() error {
-		sess, err = l.Listener.Accept()
-		return err
-	})
+	go func() {
+		if sess, err = l.Listener.Accept(); err != nil {
+			err = errors.Wrap(err, "accept")
+		}
+		close(ch)
+	}()
 
-	if g.Wait() == nil {
+	select {
+	case <-c.Done():
+		err = l.Close()
+	case <-ch:
 		conn = mkConn(sess)
 	}
 
