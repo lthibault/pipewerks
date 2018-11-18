@@ -12,7 +12,7 @@ import (
 )
 
 type listener struct {
-	c *yamux.Config
+	c *MuxConfig
 	gonet.Listener
 }
 
@@ -86,25 +86,25 @@ func (s stream) Close() error {
 
 // Transport for any net.Conn
 type Transport struct {
-	c yamux.Config
-	l NetListener
-	d NetDialer
+	MuxConfig
+	NetListener
+	NetDialer
 }
 
 // Listen Generic
 func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
-	l, err := t.l.Listen(c, a.Network(), a.String())
-	return listener{Listener: l, c: &t.c}, err
+	l, err := t.NetListener.Listen(c, a.Network(), a.String())
+	return listener{Listener: l, c: &t.MuxConfig}, err
 }
 
 // Dial Generic
 func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
-	cxn, err := t.d.DialContext(c, a.Network(), a.String())
+	cxn, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	sess, err := yamux.Client(cxn, &t.c)
+	sess, err := yamux.Client(cxn, &t.MuxConfig)
 	return conn{sess}, errors.Wrap(err, "mux")
 }
 

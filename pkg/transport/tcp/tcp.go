@@ -32,7 +32,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
 // New TCP Transport
 func New(opt ...Option) (t Transport) {
 	for _, fn := range opt {
-		fn(t.Transport)
+		fn(t)
 	}
 	return t
 }

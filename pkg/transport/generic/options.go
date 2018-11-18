@@ -7,6 +7,9 @@ import (
 	"github.com/hashicorp/yamux"
 )
 
+// MuxConfig configures the muxer
+type MuxConfig = yamux.Config
+
 type netConn = gonet.Conn
 
 // NetListener can produce a standard library Listener
@@ -25,8 +28,8 @@ type Option func(*Transport) (prev Option)
 // OptListener sets the ListenConfig
 func OptListener(l NetListener) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptListener(t.l)
-		t.l = l
+		prev = OptListener(t.NetListener)
+		t.NetListener = l
 		return
 	}
 }
@@ -34,17 +37,17 @@ func OptListener(l NetListener) Option {
 // OptDialer sets the dialer
 func OptDialer(d NetDialer) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptDialer(t.d)
-		t.d = d
+		prev = OptDialer(t.NetDialer)
+		t.NetDialer = d
 		return
 	}
 }
 
 // OptMux sets the muxer
-func OptMux(c yamux.Config) Option {
+func OptMux(c MuxConfig) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptMux(t.c)
-		t.c = c
+		prev = OptMux(t.MuxConfig)
+		t.MuxConfig = c
 		return
 	}
 }
