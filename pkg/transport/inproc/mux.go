@@ -66,7 +66,7 @@ func (c connNode) Close() error {
 		return
 	})
 
-	return c.Conn.Close()
+	return c.conn.Close()
 }
 
 func (c connNode) GetStream(path string) (streamNode, bool) {
