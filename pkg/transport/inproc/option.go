@@ -12,3 +12,12 @@ func OptDialback(a Addr) Option {
 		return
 	}
 }
+
+// OptAddrSpace sets the namespace for the the Transport
+func OptAddrSpace(n NameSpace) Option {
+	return func(t *Transport) (prev Option) {
+		prev = OptAddrSpace(t.ns)
+		t.ns = n
+		return
+	}
+}

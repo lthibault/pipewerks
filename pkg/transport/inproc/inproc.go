@@ -15,44 +15,21 @@ type Addr string
 func (Addr) Network() string  { return "inproc" }
 func (a Addr) String() string { return string(a) }
 
+// NameSpace is an isolated set of connections
+type NameSpace interface {
+	SetListener(Listener) (prev Listener, overwritten bool)
+	Serve(context.Context, net.Conn) error
+}
+
 type ep struct{ local, remote net.Addr }
 
 func (ep ep) Local() net.Addr  { return ep.local }
 func (ep ep) Remote() net.Addr { return ep.remote }
 
-type listener struct {
-	ch chan net.Conn
-	a  net.Addr
-}
-
-func (l listener) Addr() net.Addr { return l.a }
-
-func (l listener) Close() (err error) {
-	defer func() {
-		if recover() != nil {
-			err = errors.New("already closed")
-		}
-	}()
-	close(l.ch)
-	return
-}
-
-func (l listener) Accept(c context.Context) (net.Conn, error) {
-	select {
-	case conn, ok := <-l.ch:
-		if !ok {
-			return nil, errors.New("closed")
-		}
-		return conn, nil
-	case <-c.Done():
-		return nil, c.Err()
-	}
-}
-
 // Transport bytes around the process
 type Transport struct {
 	mu       sync.RWMutex
-	mux      radixMux
+	ns       NameSpace
 	dialback Addr
 }
 
@@ -65,10 +42,10 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) 
 		return nil, errors.New("invalid network")
 	}
 
-	l := listener{a: a, ch: make(chan net.Conn)}
+	l := Listener{a: Addr(a.String()), ch: make(chan net.Conn)}
 
-	if prev, exists := t.mux.SetListener(l, a.String()); exists {
-		t.mux.SetListener(prev.listener, a.String())
+	if prev, exists := t.ns.SetListener(l); exists {
+		t.ns.SetListener(prev)
 		return nil, errors.New("address in use")
 	}
 
@@ -86,13 +63,13 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (conn net.Conn, err erro
 	}
 
 	cp := newConnPair(c, t.dialback, a)
-	return cp.Local(), t.mux.ServeConn(c, cp.Remote())
+	return cp.Local(), t.ns.Serve(c, cp.Remote())
 }
 
 // New in-process Transport
 func New(opt ...Option) *Transport {
 	t := new(Transport)
-	t.mux = newMux()
+	t.ns = newMux()
 
 	OptDialback("anonymous")(t)
 

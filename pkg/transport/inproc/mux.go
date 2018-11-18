@@ -17,13 +17,12 @@ const (
 )
 
 type listenNode struct {
-	path string
-	r    *radixMux
-	listener
+	r *radixMux
+	Listener
 }
 
 func (l listenNode) Close() error {
-	_, ok := l.r.DelListener(l.path)
+	_, ok := l.r.DelListener(l.Addr().String())
 	if !ok {
 		return errors.New("not found")
 	}
@@ -33,15 +32,15 @@ func (l listenNode) Close() error {
 		return
 	})
 
-	return l.listener.Close()
+	return l.Listener.Close()
 }
 
 func (l listenNode) GetConn(path string) (connNode, bool) {
-	return l.r.GetConn(l.path, path)
+	return l.r.GetConn(l.Addr().String(), path)
 }
 
 func (l listenNode) IterConn(fn func(net.Conn) bool) {
-	(*radix.Tree)(unsafe.Pointer(l.r)).WalkPrefix(l.path, func(_ string, v interface{}) bool {
+	(*radix.Tree)(unsafe.Pointer(l.r)).WalkPrefix(l.Addr().String(), func(_ string, v interface{}) bool {
 		if c, ok := v.(net.Conn); ok {
 			return fn(c)
 		}
@@ -93,7 +92,7 @@ type radixMux struct {
 	r *radix.Tree
 }
 
-func newMux() radixMux { return radixMux{r: radix.New()} }
+func newMux() *radixMux { return &radixMux{r: radix.New()} }
 
 func (r *radixMux) GetListener(path string) (l listenNode, ok bool) {
 	r.RLock()
@@ -125,12 +124,12 @@ func (r *radixMux) GetStream(lpath, cpath, spath string) (c streamNode, ok bool)
 	return
 }
 
-func (r *radixMux) SetListener(l listener, path string) (ln listenNode, ok bool) {
+func (r *radixMux) SetListener(l Listener) (ln Listener, ok bool) {
 	r.Lock()
-	ln = listenNode{path: path, r: r, listener: l}
+	n := listenNode{r: r, Listener: l}
 	var v interface{}
-	if v, ok = r.r.Insert(path, ln); ok {
-		ln = v.(listenNode)
+	if v, ok = r.r.Insert(l.Addr().String(), n); ok {
+		ln = v.(listenNode).Listener
 	}
 	r.Unlock()
 	return
@@ -188,7 +187,7 @@ func (r *radixMux) DelStream(lpath, cpath, spath string) (c streamNode, ok bool)
 	return
 }
 
-func (r *radixMux) ServeConn(c context.Context, conn net.Conn) (err error) {
+func (r *radixMux) Serve(c context.Context, conn net.Conn) (err error) {
 	r.RLock()
 	l, ok := r.GetListener(conn.Endpoint().Local().String())
 	r.RUnlock()
@@ -197,7 +196,7 @@ func (r *radixMux) ServeConn(c context.Context, conn net.Conn) (err error) {
 		err = errors.New("connection refused")
 	} else {
 		select {
-		case l.listener.ch <- conn:
+		case l.Listener.ch <- conn:
 		case <-c.Done():
 			err = c.Err()
 		}

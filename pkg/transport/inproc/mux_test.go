@@ -17,19 +17,20 @@ func TestMux(t *testing.T) {
 	assert.Empty(t, m.r.ToMap())
 
 	t.Run("Listener", func(t *testing.T) {
-		var l listener
+		var l Listener
+		l.a = Addr(ListenerPath)
 
 		t.Run("Store", func(t *testing.T) {
 			t.Run("New", func(t *testing.T) {
-				v, replace := m.SetListener(l, ListenerPath)
+				v, replace := m.SetListener(l)
 				assert.False(t, replace, "unexpected %v (type %T)", v, v)
 			})
 
 			t.Run("Replace", func(t *testing.T) {
-				ln, replace := m.SetListener(listener{}, ListenerPath)
+				ln, replace := m.SetListener(Listener{a: Addr(ListenerPath)})
 				assert.True(t, replace, "no replacee or replacement not reported")
-				assert.Equal(t, l, ln.listener, "unexpected replacee")
-				l = ln.listener // put it back so we can continue testing
+				assert.Equal(t, l, ln, "unexpected replacee")
+				l = ln // put it back so we can continue testing
 			})
 		})
 
@@ -37,14 +38,12 @@ func TestMux(t *testing.T) {
 			t.Run("Existing", func(t *testing.T) {
 				ln, ok := m.GetListener(ListenerPath)
 				assert.True(t, ok, "retrieval failed OR false negative")
-				assert.Equal(t, l, ln.listener, "unexpected replacee")
+				assert.Equal(t, l, ln.Listener, "unexpected replacee")
 			})
 
 			t.Run("Missing", func(t *testing.T) {
-				ln, ok := m.GetListener("WRONG")
+				_, ok := m.GetListener("WRONG")
 				assert.False(t, ok, "false positive")
-				assert.Nil(t, ln.listener.a, "unexpected %T", ln.listener.a)
-				assert.Nil(t, ln.listener.ch, "unexpected %T", ln.listener.ch)
 			})
 		})
 
@@ -52,14 +51,12 @@ func TestMux(t *testing.T) {
 			t.Run("Existing", func(t *testing.T) {
 				ln, ok := m.DelListener(ListenerPath)
 				assert.True(t, ok, "retrieval failed OR false negative")
-				assert.Equal(t, l, ln.listener, "unexpected replacee")
+				assert.Equal(t, l, ln.Listener, "unexpected replacee")
 			})
 
 			t.Run("Missing", func(t *testing.T) {
-				ln, ok := m.DelListener("WRONG")
+				_, ok := m.DelListener("WRONG")
 				assert.False(t, ok, "false positive")
-				assert.Nil(t, ln.listener.a, "unexpected %T", ln.listener.a)
-				assert.Nil(t, ln.listener.ch, "unexpected %T", ln.listener.ch)
 			})
 		})
 	})
