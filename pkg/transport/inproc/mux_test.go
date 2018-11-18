@@ -152,11 +152,3 @@ func TestMux(t *testing.T) {
 		})
 	})
 }
-
-func TestListenNode(t *testing.T) {
-
-}
-
-func TestConnNode(t *testing.T) {
-
-}
