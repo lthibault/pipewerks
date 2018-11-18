@@ -9,7 +9,7 @@ import (
 
 var addrs = ep{local: Addr("/local"), remote: Addr("/remote")}
 
-func TestStreamPair(t *testing.T) {
+func TestStream(t *testing.T) {
 	p := newStreamPair(context.Background(), addrs)
 
 	t.Run("LocalStream", func(t *testing.T) {
