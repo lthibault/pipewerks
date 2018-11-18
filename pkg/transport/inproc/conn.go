@@ -3,8 +3,10 @@ package inproc
 import (
 	"context"
 	"errors"
+	"io"
 	gonet "net"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/lthibault/pipewerks/pkg/net"
@@ -23,13 +25,21 @@ func (e *atomicErr) Store(err error) {
 	(*atomic.Value)(unsafe.Pointer(e)).Store(err)
 }
 
+// goconn allows us to use some net.go niceties
+type goconn interface {
+	io.ReadWriteCloser
+	SetDeadline(t time.Time) error
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+}
+
 type connPair struct {
 	c      context.Context
 	cancel func()
 
 	ep net.EndpointPair
 
-	local, remote gonet.Conn
+	local, remote goconn
 	lerr, rerr    atomicErr
 }
 
@@ -52,7 +62,7 @@ func (p *connPair) Close() error {
 func (p *connPair) Local() net.Conn  { return p.newConn(p.local, &p.lerr, &p.rerr) }
 func (p *connPair) Remote() net.Conn { return p.newConn(p.remote, &p.rerr, &p.lerr) }
 
-func (p *connPair) newConn(cxn gonet.Conn, lerr, rerr *atomicErr) conn {
+func (p *connPair) newConn(cxn goconn, lerr, rerr *atomicErr) conn {
 	return conn{
 		c:      p.c,
 		cancel: p.cancel,
@@ -61,7 +71,7 @@ func (p *connPair) newConn(cxn gonet.Conn, lerr, rerr *atomicErr) conn {
 		ep:     p.ep,
 		lerr:   lerr,
 		rerr:   rerr,
-		Conn:   cxn,
+		goconn: cxn,
 	}
 }
 
@@ -73,7 +83,7 @@ type conn struct {
 	in, out chan net.Stream
 
 	lerr, rerr *atomicErr
-	gonet.Conn
+	goconn
 }
 
 func (c conn) Context() context.Context   { return c.c }
@@ -96,7 +106,7 @@ func (c conn) CloseWithError(_ net.ErrorCode, err error) error {
 		c.rerr.Store(err)
 		c.cancel()
 
-		err = c.Conn.Close()
+		err = c.goconn.Close()
 	}
 
 	return err
