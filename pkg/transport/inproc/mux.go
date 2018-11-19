@@ -3,10 +3,10 @@ package inproc
 import (
 	"context"
 	"errors"
+	gonet "net"
 	"sync"
 
 	radix "github.com/armon/go-radix"
-	net "github.com/lthibault/pipewerks/pkg/net"
 )
 
 type radixMux struct {
@@ -16,7 +16,7 @@ type radixMux struct {
 
 func newMux() *radixMux { return &radixMux{r: radix.New()} }
 
-func (r *radixMux) GetListener(path string) (l Listener, ok bool) {
+func (r *radixMux) GetListener(path string) (l listener, ok bool) {
 	var v interface{}
 
 	r.RLock()
@@ -24,27 +24,35 @@ func (r *radixMux) GetListener(path string) (l Listener, ok bool) {
 	r.RUnlock()
 
 	if ok {
-		l = v.(Listener)
+		l = v.(listener)
 	}
 
 	return
 }
 
-func (r *radixMux) Bind(l Listener) (ln Listener, ok bool) {
-	var v interface{}
+func (r *radixMux) Listen(c context.Context, network, address string) (gonet.Listener, error) {
+	if network != "inproc" {
+		return nil, errors.New("invalid network")
+	}
+
+	l := listener{
+		a:  Addr(address),
+		ch: make(chan gonet.Conn),
+		cq: make(chan struct{}),
+	}
 
 	r.Lock()
-	v, ok = r.r.Insert(l.Addr().String(), l)
-	r.Unlock()
+	defer r.Unlock()
 
-	if ok {
-		ln = v.(Listener)
+	if v, ok := r.r.Insert(address, l); ok {
+		r.r.Insert(address, v)
+		return nil, errors.New("address already bound")
 	}
 
-	return
+	return l, nil
 }
 
-func (r *radixMux) DelListener(path string) (l Listener, ok bool) {
+func (r *radixMux) DelListener(path string) (l listener, ok bool) {
 	var v interface{}
 
 	r.Lock()
@@ -52,25 +60,32 @@ func (r *radixMux) DelListener(path string) (l Listener, ok bool) {
 	r.Unlock()
 
 	if ok {
-		l = v.(Listener)
+		l = v.(listener)
 	}
 
 	return
 }
 
-func (r *radixMux) Connect(c context.Context, conn net.Conn) (err error) {
+func (r *radixMux) DialContext(c context.Context, network, address string) (gonet.Conn, error) {
+	if network != "inproc" {
+		return nil, errors.New("invalid network")
+	}
+
+	local, remote := gonet.Pipe()
 
 	r.RLock()
-	if l, ok := r.GetListener(conn.Endpoint().Local().String()); ok {
-		err = errors.New("connection refused")
-	} else {
-		select {
-		case l.ch <- conn:
-		case <-c.Done():
-			err = c.Err()
-		}
-	}
-	r.RUnlock()
+	defer r.RUnlock()
 
-	return
+	l, ok := r.GetListener(address)
+	if ok {
+		return nil, errors.New("connection refused")
+	}
+
+	select {
+	case l.ch <- remote:
+	case <-c.Done():
+		return nil, c.Err()
+	}
+
+	return local, nil
 }

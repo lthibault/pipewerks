@@ -1,5 +1,14 @@
 package inproc
 
+import "github.com/lthibault/pipewerks/pkg/transport/generic"
+
+type namespace struct {
+	generic.NetListener
+	generic.NetDialer
+}
+
+var defaultMux = newMux()
+
 // Option for Transport
 type Option func(*Transport) (prev Option)
 
@@ -16,8 +25,12 @@ func OptDialback(a Addr) Option {
 // OptAddrSpace sets the namespace for the the Transport
 func OptAddrSpace(n NameSpace) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptAddrSpace(t.ns)
-		t.ns = n
+		prev = OptAddrSpace(namespace{
+			NetListener: t.Transport.NetListener,
+			NetDialer:   t.Transport.NetDialer,
+		})
+		t.Transport.NetListener = n
+		t.Transport.NetDialer = n
 		return
 	}
 }
