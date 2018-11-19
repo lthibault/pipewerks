@@ -53,13 +53,18 @@ func HandleConns(c context.Context, l net.Listener, h ConnHandler) {
 // stream negotiation are passed to the function.
 type StreamHandler func(net.Stream, error)
 
+// StreamMuxer can produce a Streamer
+type StreamMuxer interface {
+	Stream() Streamer
+}
+
 // HandleStreams calles s.Accept() in a loop and calls h in a new goroutine.
 // When c expires, the loop exits.
-func HandleStreams(c context.Context, s net.Streamer, h StreamHandler) {
+func HandleStreams(c context.Context, s StreamMuxer, h StreamHandler) {
 	var str net.Stream
 	var err error
 	for range ctx.Tick(c) {
-		str, err = s.Accept()
+		str, err = s.Stream().Accept()
 
 		select {
 		case <-c.Done():
