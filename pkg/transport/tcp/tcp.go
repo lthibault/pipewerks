@@ -3,7 +3,7 @@ package tcp
 import (
 	"context"
 
-	"github.com/lthibault/pipewerks/pkg/net"
+	"github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )

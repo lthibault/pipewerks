@@ -9,7 +9,7 @@ import (
 
 	"github.com/SentimensRG/ctx"
 	log "github.com/lthibault/log/pkg"
-	net "github.com/lthibault/pipewerks/pkg/net"
+	net "github.com/lthibault/pipewerks/pkg"
 	quic "github.com/lucas-clemente/quic-go"
 	"github.com/pkg/errors"
 )

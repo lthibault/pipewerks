@@ -3,7 +3,7 @@ package kcp
 import (
 	"context"
 
-	"github.com/lthibault/pipewerks/pkg/net"
+	net "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )

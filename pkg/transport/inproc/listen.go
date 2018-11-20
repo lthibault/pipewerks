@@ -4,7 +4,7 @@ import (
 	"errors"
 	gonet "net"
 
-	"github.com/lthibault/pipewerks/pkg/net"
+	"github.com/lthibault/pipewerks/pkg"
 )
 
 type listener struct {

@@ -7,7 +7,7 @@ import (
 	"github.com/SentimensRG/ctx"
 
 	"github.com/hashicorp/yamux"
-	net "github.com/lthibault/pipewerks/pkg/net"
+	net "github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
 )
 
