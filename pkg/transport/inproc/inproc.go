@@ -26,17 +26,18 @@ func (e edge) Remote() net.Addr { return e.remote }
 // Transport bytes around the process
 type Transport struct {
 	dialback Addr
-	*generic.Transport
+	generic.Transport
 }
 
 // New in-process Transport
-func New(opt ...Option) *Transport {
-	t := new(Transport)
+func New(opt ...Option) (t *Transport) {
+	t = new(Transport)
+
 	OptDialback("anonymous")(t)
 	OptAddrSpace(defaultMux)(t)
 
 	for _, o := range opt {
 		o(t)
 	}
-	return t
+	return
 }
