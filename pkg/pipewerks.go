@@ -3,7 +3,6 @@ package net
 import (
 	"context"
 
-	"github.com/SentimensRG/ctx"
 	net "github.com/lthibault/pipewerks/pkg/net"
 )
 
@@ -27,51 +26,6 @@ type Server interface {
 // NewServer that listens on a over t
 func NewServer(t net.Transport, a net.Addr) Server {
 	return peer{dialListener: dialListener{t}, a: a}
-}
-
-// ConnHandler does something with a conn.  Any errors encountered during conn
-// negotiation are passed to the function.
-type ConnHandler func(net.Conn, error)
-
-// HandleConns calls l.Accept() in a loop and calls h in a new goroutine.
-// When c expires, the loop exits.
-func HandleConns(c context.Context, l net.Listener, h ConnHandler) {
-	var conn net.Conn
-	var err error
-	for range ctx.Tick(c) {
-		conn, err = l.Accept(c)
-
-		select {
-		case <-c.Done():
-		default:
-			go h(conn, err)
-		}
-	}
-}
-
-// StreamHandler does something with a stream.  Any errors encountered during
-// stream negotiation are passed to the function.
-type StreamHandler func(net.Stream, error)
-
-// StreamMuxer can produce a Streamer
-type StreamMuxer interface {
-	Stream() Streamer
-}
-
-// HandleStreams calles s.Accept() in a loop and calls h in a new goroutine.
-// When c expires, the loop exits.
-func HandleStreams(c context.Context, s StreamMuxer, h StreamHandler) {
-	var str net.Stream
-	var err error
-	for range ctx.Tick(c) {
-		str, err = s.Stream().Accept()
-
-		select {
-		case <-c.Done():
-		default:
-			go h(str, err)
-		}
-	}
 }
 
 type dialListener struct{ net.Transport }
