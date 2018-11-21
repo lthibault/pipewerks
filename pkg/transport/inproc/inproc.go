@@ -1,7 +1,8 @@
 package inproc
 
 import (
-	net "github.com/lthibault/pipewerks/pkg"
+	"net"
+
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 )
 

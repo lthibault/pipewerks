@@ -2,14 +2,12 @@ package inproc
 
 import (
 	"errors"
-	gonet "net"
-
-	"github.com/lthibault/pipewerks/pkg"
+	"net"
 )
 
 type listener struct {
 	cq chan struct{}
-	ch chan gonet.Conn
+	ch chan net.Conn
 	a  Addr
 }
 
@@ -26,7 +24,7 @@ func (l listener) Close() (err error) {
 	return
 }
 
-func (l listener) Accept() (gonet.Conn, error) {
+func (l listener) Accept() (net.Conn, error) {
 	select {
 	case conn, ok := <-l.ch:
 		if !ok {

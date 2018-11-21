@@ -2,8 +2,9 @@ package kcp
 
 import (
 	"context"
+	"net"
 
-	net "github.com/lthibault/pipewerks/pkg"
+	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ type Option = generic.Option
 type Transport struct{ *generic.Transport }
 
 // Listen KCP
-func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
+func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	if a.Network() != "kcp" {
 		return nil, errors.New("invalid network")
 	}
@@ -24,7 +25,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
 }
 
 // Dial KCP
-func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
+func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	if a.Network() != "kcp" {
 		return nil, errors.New("invalid network")
 	}

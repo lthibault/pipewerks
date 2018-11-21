@@ -2,8 +2,9 @@ package tcp
 
 import (
 	"context"
+	"net"
 
-	"github.com/lthibault/pipewerks/pkg"
+	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )
@@ -12,7 +13,7 @@ import (
 type Transport struct{ *generic.Transport }
 
 // Listen TCP
-func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
+func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	if a.Network() != "tcp" {
 		return nil, errors.New("invalid network")
 	}
@@ -21,7 +22,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
 }
 
 // Dial TCP
-func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
+func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	if a.Network() != "tcp" {
 		return nil, errors.New("invalid network")
 	}

@@ -2,7 +2,7 @@ package generic
 
 import (
 	"context"
-	gonet "net"
+	"net"
 
 	"github.com/hashicorp/yamux"
 )
@@ -10,16 +10,14 @@ import (
 // MuxConfig configures the muxer
 type MuxConfig = yamux.Config
 
-type netConn = gonet.Conn
-
 // NetListener can produce a standard library Listener
 type NetListener interface {
-	Listen(c context.Context, network, address string) (gonet.Listener, error)
+	Listen(c context.Context, network, address string) (net.Listener, error)
 }
 
 // NetDialer can produce a standard library Dialer
 type NetDialer interface {
-	DialContext(c context.Context, network, address string) (gonet.Conn, error)
+	DialContext(c context.Context, network, address string) (net.Conn, error)
 }
 
 // Option for TCP transport

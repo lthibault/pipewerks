@@ -3,7 +3,7 @@ package inproc
 import (
 	"context"
 	"errors"
-	gonet "net"
+	"net"
 	"sync"
 
 	radix "github.com/armon/go-radix"
@@ -30,14 +30,14 @@ func (r *radixMux) GetListener(path string) (l listener, ok bool) {
 	return
 }
 
-func (r *radixMux) Listen(c context.Context, network, address string) (gonet.Listener, error) {
+func (r *radixMux) Listen(c context.Context, network, address string) (net.Listener, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
 	l := listener{
 		a:  Addr(address),
-		ch: make(chan gonet.Conn),
+		ch: make(chan net.Conn),
 		cq: make(chan struct{}),
 	}
 
@@ -66,12 +66,12 @@ func (r *radixMux) DelListener(path string) (l listener, ok bool) {
 	return
 }
 
-func (r *radixMux) DialContext(c context.Context, network, address string) (gonet.Conn, error) {
+func (r *radixMux) DialContext(c context.Context, network, address string) (net.Conn, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
-	local, remote := gonet.Pipe()
+	local, remote := net.Pipe()
 
 	r.RLock()
 	defer r.RUnlock()

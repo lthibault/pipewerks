@@ -6,10 +6,11 @@ import (
 	"encoding/binary"
 	"io"
 	"io/ioutil"
+	"net"
 
 	"github.com/SentimensRG/ctx"
 	log "github.com/lthibault/log/pkg"
-	net "github.com/lthibault/pipewerks/pkg"
+	pipe "github.com/lthibault/pipewerks/pkg"
 	quic "github.com/lucas-clemente/quic-go"
 	"github.com/pkg/errors"
 )
@@ -23,10 +24,10 @@ func mkConn(s quic.Session) *conn {
 	return &conn{Session: s}
 }
 
-func (conn *conn) Stream() net.Streamer       { return conn }
-func (conn conn) Accept() (net.Stream, error) { return conn.Accept() }
+func (conn *conn) Stream() pipe.Streamer       { return conn }
+func (conn conn) Accept() (pipe.Stream, error) { return conn.Accept() }
 
-func (conn conn) Open() (net.Stream, error) {
+func (conn conn) Open() (pipe.Stream, error) {
 	s, err := conn.OpenStream()
 	if err != nil {
 		return nil, errors.Wrap(err, "open stream")
@@ -49,18 +50,18 @@ func (conn conn) Open() (net.Stream, error) {
 	}, nil
 }
 
-func (conn *conn) Endpoint() net.Edge { return conn }
-func (conn conn) Local() net.Addr     { return conn.LocalAddr() }
-func (conn conn) Remote() net.Addr    { return conn.RemoteAddr() }
+func (conn *conn) Endpoint() pipe.Edge { return conn }
+func (conn conn) Local() net.Addr      { return conn.LocalAddr() }
+func (conn conn) Remote() net.Addr     { return conn.RemoteAddr() }
 
 type stream struct {
 	path string
 	quic.Stream
-	net.Edge
+	pipe.Edge
 }
 
-func (s stream) Path() string       { return s.path }
-func (s stream) Endpoint() net.Edge { return s.Edge }
+func (s stream) Path() string        { return s.path }
+func (s stream) Endpoint() pipe.Edge { return s.Edge }
 
 // Transport over QUIC
 type Transport struct {
@@ -69,7 +70,7 @@ type Transport struct {
 }
 
 // Dial the specified address
-func (t *Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
+func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	log.Get(c).Debug("dialing")
 
 	sess, err := quic.DialAddrContext(c, a.String(), t.t, t.q)
@@ -83,7 +84,7 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
 }
 
 // Listen on the specified address
-func (t *Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
+func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	log.Get(c).Debug("listening")
 
 	l, err := quic.ListenAddr(a.String(), t.t, t.q)
@@ -97,7 +98,7 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) 
 
 type listener struct{ quic.Listener }
 
-func (l listener) Accept(c context.Context) (conn net.Conn, err error) {
+func (l listener) Accept(c context.Context) (conn pipe.Conn, err error) {
 	var sess quic.Session
 	ch := make(chan struct{})
 

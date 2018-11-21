@@ -2,29 +2,29 @@ package generic
 
 import (
 	"context"
-	gonet "net"
+	"net"
 
 	"github.com/SentimensRG/ctx"
+	pipe "github.com/lthibault/pipewerks/pkg"
 
 	"github.com/hashicorp/yamux"
-	net "github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
 )
 
 type listener struct {
 	c *MuxConfig
-	gonet.Listener
+	net.Listener
 }
 
-func (l listener) Accept(c context.Context) (cxn net.Conn, err error) {
+func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
 	var sess *yamux.Session
 	ch := make(chan struct{})
 
 	go func() {
-		var goconn netConn
-		if goconn, err = l.Listener.Accept(); err != nil {
+		var conn net.Conn
+		if conn, err = l.Listener.Accept(); err != nil {
 			err = errors.Wrap(err, "accept")
-		} else if sess, err = yamux.Server(goconn, l.c); err != nil {
+		} else if sess, err = yamux.Server(conn, l.c); err != nil {
 			err = errors.Wrap(err, "mux")
 		}
 		close(ch)
@@ -56,16 +56,16 @@ func (c conn) Context() context.Context {
 	return ctx.AsContext(ctx.C(c.CloseChan()))
 }
 
-func (c conn) Endpoint() net.Edge   { return edge{c} }
-func (c conn) Stream() net.Streamer { return c }
+func (c conn) Endpoint() pipe.Edge   { return edge{c} }
+func (c conn) Stream() pipe.Streamer { return c }
 
-func (c conn) Open() (net.Stream, error) {
+func (c conn) Open() (pipe.Stream, error) {
 	s, err := c.OpenStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
 }
 
-func (c conn) Accept() (net.Stream, error) {
+func (c conn) Accept() (pipe.Stream, error) {
 	s, err := c.AcceptStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
@@ -78,13 +78,13 @@ type stream struct {
 }
 
 func (s stream) Context() context.Context { return s.c }
-func (s stream) Endpoint() net.Edge       { return edge{s} }
+func (s stream) Endpoint() pipe.Edge      { return edge{s} }
 func (s stream) Close() error {
 	s.cancel()
 	return s.Stream.Close()
 }
 
-// Transport for any net.Conn
+// Transport for any pipe.Conn
 type Transport struct {
 	MuxConfig
 	NetListener
@@ -92,13 +92,13 @@ type Transport struct {
 }
 
 // Listen Generic
-func (t Transport) Listen(c context.Context, a net.Addr) (net.Listener, error) {
+func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{Listener: l, c: &t.MuxConfig}, err
 }
 
 // Dial Generic
-func (t Transport) Dial(c context.Context, a net.Addr) (net.Conn, error) {
+func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	cxn, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")

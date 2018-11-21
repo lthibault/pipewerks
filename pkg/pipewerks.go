@@ -1,4 +1,4 @@
-package net
+package pipe
 
 import (
 	"context"
@@ -6,30 +6,16 @@ import (
 	"time"
 )
 
-// Addr represents a network end point address.
-//
-// The two methods Network and String conventionally return strings
-// that can be passed as the arguments to Dial, but the exact form
-// and meaning of the strings is up to the implementation.
-type Addr = net.Addr
-
-// An Error represents a network error.
-type Error interface {
-	error
-	Timeout() bool   // Is the error a timeout?
-	Temporary() bool // Is the error temporary?
-}
-
 // Transport is a means by which to connect to an listen for connections from
 // other peers.
 type Transport interface {
-	Listen(context.Context, Addr) (Listener, error)
-	Dial(context.Context, Addr) (Conn, error)
+	Listen(context.Context, net.Addr) (Listener, error)
+	Dial(context.Context, net.Addr) (Conn, error)
 }
 
 // Listener can listen for incoming connections
 type Listener interface {
-	Addr() Addr
+	Addr() net.Addr
 	Close() error
 	Accept(context.Context) (Conn, error)
 }
@@ -51,8 +37,8 @@ type Streamer interface {
 
 // Edge identifies a connection between to endpoints
 type Edge interface {
-	Local() Addr
-	Remote() Addr
+	Local() net.Addr
+	Remote() net.Addr
 }
 
 // Stream is a bidirectional connection between two hosts.
