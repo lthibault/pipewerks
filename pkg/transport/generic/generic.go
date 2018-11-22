@@ -17,14 +17,14 @@ type listener struct {
 }
 
 func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
+	var raw net.Conn
 	var sess *yamux.Session
 	ch := make(chan struct{})
 
 	go func() {
-		var conn net.Conn
-		if conn, err = l.Listener.Accept(); err != nil {
+		if raw, err = l.Listener.Accept(); err != nil {
 			err = errors.Wrap(err, "listener")
-		} else if sess, err = yamux.Server(conn, l.c); err != nil {
+		} else if sess, err = yamux.Server(raw, l.c); err != nil {
 			err = errors.Wrap(err, "mux")
 		}
 		close(ch)
@@ -34,7 +34,7 @@ func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
 	case <-c.Done():
 		err = c.Err()
 	case <-ch:
-		cxn = conn{sess}
+		cxn = conn{Session: sess, raw: raw}
 	}
 
 	return
@@ -50,12 +50,16 @@ type edge struct{ addresser }
 func (e edge) Local() net.Addr  { return e.LocalAddr() }
 func (e edge) Remote() net.Addr { return e.RemoteAddr() }
 
-type conn struct{ *yamux.Session }
+type conn struct {
+	*yamux.Session
+	raw net.Conn
+}
 
 func (c conn) Context() context.Context {
 	return ctx.AsContext(ctx.C(c.CloseChan()))
 }
 
+func (c conn) Raw() net.Conn         { return c.raw }
 func (c conn) Endpoint() pipe.Edge   { return edge{c} }
 func (c conn) Stream() pipe.Streamer { return c }
 
@@ -105,7 +109,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	}
 
 	sess, err := yamux.Client(cxn, t.MuxConfig)
-	return conn{sess}, errors.Wrap(err, "mux")
+	return conn{Session: sess, raw: cxn}, errors.Wrap(err, "mux")
 }
 
 // New Generic Transport
