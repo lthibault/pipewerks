@@ -42,7 +42,7 @@ func OptDialer(d NetDialer) Option {
 }
 
 // OptMux sets the muxer
-func OptMux(c MuxConfig) Option {
+func OptMux(c *MuxConfig) Option {
 	return func(t *Transport) (prev Option) {
 		prev = OptMux(t.MuxConfig)
 		t.MuxConfig = c

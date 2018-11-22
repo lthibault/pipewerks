@@ -2,11 +2,11 @@ package inproc
 
 import (
 	"context"
-	"errors"
 	"net"
 	"sync"
 
 	radix "github.com/armon/go-radix"
+	"github.com/pkg/errors"
 )
 
 type radixMux struct {
@@ -17,13 +17,11 @@ type radixMux struct {
 func newMux() *radixMux { return &radixMux{r: radix.New()} }
 
 func (r *radixMux) GetListener(path string) (l listener, ok bool) {
-	var v interface{}
-
 	r.RLock()
-	v, ok = r.r.Get(path)
-	r.RUnlock()
+	defer r.RUnlock()
 
-	if ok {
+	var v interface{}
+	if v, ok = r.r.Get(path); ok {
 		l = v.(listener)
 	}
 
@@ -31,18 +29,19 @@ func (r *radixMux) GetListener(path string) (l listener, ok bool) {
 }
 
 func (r *radixMux) Listen(c context.Context, network, address string) (net.Listener, error) {
+	r.Lock()
+	defer r.Unlock()
+
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
 	l := listener{
-		a:  Addr(address),
-		ch: make(chan net.Conn),
-		cq: make(chan struct{}),
+		a:      Addr(address),
+		ch:     make(chan net.Conn),
+		cq:     make(chan struct{}),
+		unbind: r.Unbind,
 	}
-
-	r.Lock()
-	defer r.Unlock()
 
 	if v, ok := r.r.Insert(address, l); ok {
 		r.r.Insert(address, v)
@@ -52,18 +51,10 @@ func (r *radixMux) Listen(c context.Context, network, address string) (net.Liste
 	return l, nil
 }
 
-func (r *radixMux) DelListener(path string) (l listener, ok bool) {
-	var v interface{}
-
+func (r *radixMux) Unbind(path string) {
 	r.Lock()
-	v, ok = r.r.Delete(path)
+	r.r.Delete(path)
 	r.Unlock()
-
-	if ok {
-		l = v.(listener)
-	}
-
-	return
 }
 
 func (r *radixMux) DialContext(c context.Context, network, address string) (net.Conn, error) {
@@ -73,11 +64,8 @@ func (r *radixMux) DialContext(c context.Context, network, address string) (net.
 
 	local, remote := net.Pipe()
 
-	r.RLock()
-	defer r.RUnlock()
-
 	l, ok := r.GetListener(address)
-	if ok {
+	if !ok {
 		return nil, errors.New("connection refused")
 	}
 

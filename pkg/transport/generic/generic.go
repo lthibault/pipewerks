@@ -23,7 +23,7 @@ func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
 	go func() {
 		var conn net.Conn
 		if conn, err = l.Listener.Accept(); err != nil {
-			err = errors.Wrap(err, "accept")
+			err = errors.Wrap(err, "listener")
 		} else if sess, err = yamux.Server(conn, l.c); err != nil {
 			err = errors.Wrap(err, "mux")
 		}
@@ -32,7 +32,7 @@ func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
 
 	select {
 	case <-c.Done():
-		err = l.Close()
+		err = c.Err()
 	case <-ch:
 		cxn = conn{sess}
 	}
@@ -86,7 +86,7 @@ func (s stream) Close() error {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	MuxConfig
+	*MuxConfig
 	NetListener
 	NetDialer
 }
@@ -94,7 +94,7 @@ type Transport struct {
 // Listen Generic
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
-	return listener{Listener: l, c: &t.MuxConfig}, err
+	return listener{Listener: l, c: t.MuxConfig}, err
 }
 
 // Dial Generic
@@ -104,7 +104,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	sess, err := yamux.Client(cxn, &t.MuxConfig)
+	sess, err := yamux.Client(cxn, t.MuxConfig)
 	return conn{sess}, errors.Wrap(err, "mux")
 }
 
