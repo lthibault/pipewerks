@@ -62,6 +62,7 @@ type stream struct {
 
 func (s stream) Path() string        { return s.path }
 func (s stream) Endpoint() pipe.Edge { return s.Edge }
+func (s stream) StreamID() uint32    { return uint32(s.Stream.StreamID()) }
 
 // Transport over QUIC
 type Transport struct {

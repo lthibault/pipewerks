@@ -43,6 +43,7 @@ type Edge interface {
 
 // Stream is a bidirectional connection between two hosts.
 type Stream interface {
+	StreamID() uint32
 	Context() context.Context
 	Endpoint() Edge
 	Close() error
