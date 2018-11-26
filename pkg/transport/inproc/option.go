@@ -1,6 +1,11 @@
 package inproc
 
-import "github.com/lthibault/pipewerks/pkg/transport/generic"
+import (
+	"net"
+
+	"github.com/lthibault/pipewerks/pkg/transport/generic"
+	"github.com/pkg/errors"
+)
 
 type namespace struct {
 	generic.NetListener
@@ -14,10 +19,14 @@ type Option func(*Transport) (prev Option)
 
 // OptDialback sets the dialback addr for a transport.  This is useful when
 // dialers are also listening, and need to announce the listen address.
-func OptDialback(a Addr) Option {
+func OptDialback(a net.Addr) Option {
+	if a.Network() != "inproc" {
+		panic(errors.Errorf("invalid network %s", a.Network()))
+	}
+
 	return func(t *Transport) (prev Option) {
 		prev = OptDialback(t.dialback)
-		t.dialback = a
+		t.dialback = Addr(a.String())
 		return
 	}
 }

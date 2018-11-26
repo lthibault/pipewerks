@@ -34,7 +34,7 @@ type Transport struct {
 func New(opt ...Option) (t *Transport) {
 	t = new(Transport)
 
-	OptDialback("anonymous")(t)
+	OptDialback(Addr("anonymous"))(t)
 	OptAddrSpace(defaultMux)(t)
 
 	for _, o := range opt {
