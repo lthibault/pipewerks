@@ -1,11 +1,29 @@
 package inproc
 
 import (
+	"context"
 	"net"
 
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )
+
+type ctxKey uint8
+
+const (
+	keyDialback ctxKey = iota
+)
+
+func setDialback(c context.Context, a Addr) context.Context {
+	return context.WithValue(c, keyDialback, a)
+}
+
+func getDialback(c context.Context) Addr {
+	if a, ok := c.Value(keyDialback).(Addr); ok {
+		return a
+	}
+	return ""
+}
 
 type namespace struct {
 	generic.NetListener

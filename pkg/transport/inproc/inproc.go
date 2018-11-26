@@ -1,8 +1,10 @@
 package inproc
 
 import (
+	"context"
 	"net"
 
+	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 )
 
@@ -28,6 +30,14 @@ func (e edge) Remote() net.Addr { return e.remote }
 type Transport struct {
 	dialback Addr
 	generic.Transport
+}
+
+// Dial sets the dialback addr before dialing into the connection.
+func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
+	if t.dialback != "" {
+		c = setDialback(c, t.dialback)
+	}
+	return t.Transport.Dial(c, a)
 }
 
 // New in-process Transport

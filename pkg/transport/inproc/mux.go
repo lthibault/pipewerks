@@ -57,23 +57,39 @@ func (r *radixMux) Unbind(path string) {
 	r.Unlock()
 }
 
-func (r *radixMux) DialContext(c context.Context, network, address string) (net.Conn, error) {
+func (r *radixMux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
 	local, remote := net.Pipe()
 
-	l, ok := r.GetListener(address)
+	l, ok := r.GetListener(addr)
 	if !ok {
 		return nil, errors.New("connection refused")
 	}
 
+	o := getDialback(c) // get the override addr if it's set
+
 	select {
-	case l.ch <- remote:
+	case l.ch <- addrOverride{
+		Conn: remote,
+		edge: edge{local: Addr(addr), remote: o},
+	}:
 	case <-c.Done():
 		return nil, c.Err()
 	}
 
-	return local, nil
+	return addrOverride{
+		Conn: local,
+		edge: edge{local: o, remote: Addr(addr)},
+	}, nil
 }
+
+type addrOverride struct {
+	edge
+	net.Conn
+}
+
+func (o addrOverride) LocalAddr() net.Addr  { return o.edge.Local() }
+func (o addrOverride) RemoteAddr() net.Addr { return o.edge.Remote() }
