@@ -27,11 +27,11 @@ func OptDialer(d *net.Dialer) Option {
 	}
 }
 
-// OptMux sets the muxer
-func OptMux(c *generic.MuxConfig) Option {
+// OptMuxAdapter sets the muxer
+func OptMuxAdapter(x generic.MuxAdapter) Option {
 	return func(t Transport) (prev Option) {
-		prev = OptMux(t.Transport.MuxConfig)
-		t.Transport.MuxConfig = c
+		prev = OptMuxAdapter(t.Transport.MuxAdapter)
+		t.Transport.MuxAdapter = x
 		return
 	}
 }

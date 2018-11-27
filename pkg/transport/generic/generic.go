@@ -12,32 +12,23 @@ import (
 )
 
 type listener struct {
-	c *MuxConfig
+	serverMuxAdapter
 	net.Listener
 }
 
-func (l listener) Accept(c context.Context) (cxn pipe.Conn, err error) {
-	var raw net.Conn
-	var sess *yamux.Session
-	ch := make(chan struct{})
-
-	go func() {
-		if raw, err = l.Listener.Accept(); err != nil {
-			err = errors.Wrap(err, "listener")
-		} else if sess, err = yamux.Server(raw, l.c); err != nil {
-			err = errors.Wrap(err, "mux")
-		}
-		close(ch)
-	}()
-
-	select {
-	case <-c.Done():
-		err = c.Err()
-	case <-ch:
-		cxn = conn{Session: sess, raw: raw}
+func (l listener) Accept() (pipe.Conn, error) {
+	raw, err := l.Listener.Accept()
+	if err != nil {
+		return nil, errors.Wrap(err, "listener")
 	}
 
-	return
+	conn, err := l.AdaptServer(raw)
+	if err != nil {
+		raw.Close()
+		return nil, errors.Wrap(err, "mux")
+	}
+
+	return conn, nil
 }
 
 type addresser interface {
@@ -50,26 +41,22 @@ type edge struct{ addresser }
 func (e edge) Local() net.Addr  { return e.LocalAddr() }
 func (e edge) Remote() net.Addr { return e.RemoteAddr() }
 
-type conn struct {
-	*yamux.Session
-	raw net.Conn
-}
+type connection struct{ *yamux.Session }
 
-func (c conn) Context() context.Context {
+func (c connection) Context() context.Context {
 	return ctx.AsContext(ctx.C(c.CloseChan()))
 }
 
-func (c conn) Raw() net.Conn         { return c.raw }
-func (c conn) Endpoint() pipe.Edge   { return edge{c} }
-func (c conn) Stream() pipe.Streamer { return c }
+func (c connection) Endpoint() pipe.Edge   { return edge{c} }
+func (c connection) Stream() pipe.Streamer { return c }
 
-func (c conn) Open() (pipe.Stream, error) {
+func (c connection) Open() (pipe.Stream, error) {
 	s, err := c.OpenStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
 }
 
-func (c conn) Accept() (pipe.Stream, error) {
+func (c connection) Accept() (pipe.Stream, error) {
 	s, err := c.AcceptStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
@@ -90,7 +77,7 @@ func (s stream) Close() error {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	*MuxConfig
+	MuxAdapter
 	NetListener
 	NetDialer
 }
@@ -98,23 +85,27 @@ type Transport struct {
 // Listen Generic
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
-	return listener{Listener: l, c: t.MuxConfig}, err
+	return listener{Listener: l, serverMuxAdapter: t.MuxAdapter}, err
 }
 
 // Dial Generic
 func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	cxn, err := t.NetDialer.DialContext(c, a.Network(), a.String())
+	conn, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	sess, err := yamux.Client(cxn, t.MuxConfig)
-	return conn{Session: sess, raw: cxn}, errors.Wrap(err, "mux")
+	return t.AdaptClient(conn)
 }
 
 // New Generic Transport
 func New(opt ...Option) *Transport {
 	t := new(Transport)
+
+	// defaults
+	t.MuxAdapter = MuxConfig{}
+
+	// overrides
 	for _, fn := range opt {
 		fn(t)
 	}

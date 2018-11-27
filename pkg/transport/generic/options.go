@@ -5,10 +5,9 @@ import (
 	"net"
 
 	"github.com/hashicorp/yamux"
+	pipe "github.com/lthibault/pipewerks/pkg"
+	"github.com/pkg/errors"
 )
-
-// MuxConfig configures the muxer
-type MuxConfig = yamux.Config
 
 // NetListener can produce a standard library Listener
 type NetListener interface {
@@ -18,6 +17,31 @@ type NetListener interface {
 // NetDialer can produce a standard library Dialer
 type NetDialer interface {
 	DialContext(c context.Context, network, address string) (net.Conn, error)
+}
+
+type serverMuxAdapter interface {
+	AdaptServer(net.Conn) (pipe.Conn, error)
+}
+
+// MuxAdapter can adapt a go net.Conn into a pipe.Conn
+type MuxAdapter interface {
+	AdaptServer(net.Conn) (pipe.Conn, error)
+	AdaptClient(net.Conn) (pipe.Conn, error)
+}
+
+// MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
+type MuxConfig struct{ *yamux.Config }
+
+// AdaptServer is called by the listener
+func (c MuxConfig) AdaptServer(conn net.Conn) (pipe.Conn, error) {
+	sess, err := yamux.Server(conn, c.Config)
+	return connection{Session: sess}, errors.Wrap(err, "yamux")
+}
+
+// AdaptClient is called by the dialer
+func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
+	sess, err := yamux.Client(conn, c.Config)
+	return connection{Session: sess}, errors.Wrap(err, "yamux")
 }
 
 // Option for TCP transport
@@ -41,11 +65,11 @@ func OptDialer(d NetDialer) Option {
 	}
 }
 
-// OptMux sets the muxer
-func OptMux(c *MuxConfig) Option {
+// OptMuxAdapter sets the muxer
+func OptMuxAdapter(x MuxAdapter) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptMux(t.MuxConfig)
-		t.MuxConfig = c
+		prev = OptMuxAdapter(t.MuxAdapter)
+		t.MuxAdapter = x
 		return
 	}
 }

@@ -29,7 +29,7 @@ func (e edge) Remote() net.Addr { return e.remote }
 // Transport bytes around the process
 type Transport struct {
 	dialback Addr
-	generic.Transport
+	*generic.Transport
 }
 
 // Dial sets the dialback addr before dialing into the connection.
@@ -43,6 +43,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 // New in-process Transport
 func New(opt ...Option) (t *Transport) {
 	t = new(Transport)
+	t.Transport = generic.New()
 
 	OptDialback(Addr("anonymous"))(t)
 	OptAddrSpace(defaultMux)(t)

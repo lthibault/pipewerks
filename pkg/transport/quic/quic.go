@@ -99,25 +99,13 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error)
 
 type listener struct{ quic.Listener }
 
-func (l listener) Accept(c context.Context) (conn pipe.Conn, err error) {
-	var sess quic.Session
-	ch := make(chan struct{})
-
-	go func() {
-		if sess, err = l.Listener.Accept(); err != nil {
-			err = errors.Wrap(err, "accept")
-		}
-		close(ch)
-	}()
-
-	select {
-	case <-c.Done():
-		err = l.Close()
-	case <-ch:
-		conn = mkConn(sess)
+func (l listener) Accept() (conn pipe.Conn, err error) {
+	sess, err := l.Listener.Accept()
+	if err != nil {
+		return nil, errors.Wrap(err, "accept")
 	}
 
-	return
+	return mkConn(sess), nil
 }
 
 // New Transport over QUIC
