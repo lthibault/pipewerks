@@ -98,6 +98,21 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	return t.AdaptClient(conn)
 }
 
+// MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
+type MuxConfig struct{ *yamux.Config }
+
+// AdaptServer is called by the listener
+func (c MuxConfig) AdaptServer(conn net.Conn) (pipe.Conn, error) {
+	sess, err := yamux.Server(conn, c.Config)
+	return connection{Session: sess}, errors.Wrap(err, "yamux")
+}
+
+// AdaptClient is called by the dialer
+func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
+	sess, err := yamux.Client(conn, c.Config)
+	return connection{Session: sess}, errors.Wrap(err, "yamux")
+}
+
 // New Generic Transport
 func New(opt ...Option) *Transport {
 	t := new(Transport)

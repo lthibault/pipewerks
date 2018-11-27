@@ -4,9 +4,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/hashicorp/yamux"
 	pipe "github.com/lthibault/pipewerks/pkg"
-	"github.com/pkg/errors"
 )
 
 // NetListener can produce a standard library Listener
@@ -27,21 +25,6 @@ type serverMuxAdapter interface {
 type MuxAdapter interface {
 	AdaptServer(net.Conn) (pipe.Conn, error)
 	AdaptClient(net.Conn) (pipe.Conn, error)
-}
-
-// MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
-type MuxConfig struct{ *yamux.Config }
-
-// AdaptServer is called by the listener
-func (c MuxConfig) AdaptServer(conn net.Conn) (pipe.Conn, error) {
-	sess, err := yamux.Server(conn, c.Config)
-	return connection{Session: sess}, errors.Wrap(err, "yamux")
-}
-
-// AdaptClient is called by the dialer
-func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
-	sess, err := yamux.Client(conn, c.Config)
-	return connection{Session: sess}, errors.Wrap(err, "yamux")
 }
 
 // Option for TCP transport
