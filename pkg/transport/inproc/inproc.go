@@ -21,11 +21,6 @@ type NameSpace interface {
 	generic.NetDialer
 }
 
-type edge struct{ local, remote net.Addr }
-
-func (e edge) Local() net.Addr  { return e.local }
-func (e edge) Remote() net.Addr { return e.remote }
-
 // Transport bytes around the process
 type Transport struct {
 	dialback Addr

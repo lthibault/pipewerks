@@ -24,28 +24,19 @@ type Listener interface {
 // multiplexed onto connections
 type Conn interface {
 	Context() context.Context
-	Stream() Streamer
-	Endpoint() Edge
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
+	AcceptStream() (Stream, error)
+	OpenStream() (Stream, error)
 	Close() error
-}
-
-// Streamer can open and close various types of streams
-type Streamer interface {
-	Accept() (Stream, error)
-	Open() (Stream, error)
-}
-
-// Edge identifies a connection between to endpoints
-type Edge interface {
-	Local() net.Addr
-	Remote() net.Addr
 }
 
 // Stream is a bidirectional connection between two hosts.
 type Stream interface {
-	StreamID() uint32
 	Context() context.Context
-	Endpoint() Edge
+	StreamID() uint32
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
 	Close() error
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)

@@ -36,28 +36,20 @@ type addresser interface {
 	RemoteAddr() net.Addr
 }
 
-type edge struct{ addresser }
-
-func (e edge) Local() net.Addr  { return e.LocalAddr() }
-func (e edge) Remote() net.Addr { return e.RemoteAddr() }
-
 type connection struct{ *yamux.Session }
 
 func (c connection) Context() context.Context {
 	return ctx.AsContext(ctx.C(c.CloseChan()))
 }
 
-func (c connection) Endpoint() pipe.Edge   { return edge{c} }
-func (c connection) Stream() pipe.Streamer { return c }
-
-func (c connection) Open() (pipe.Stream, error) {
-	s, err := c.OpenStream()
+func (c connection) OpenStream() (pipe.Stream, error) {
+	s, err := c.Session.OpenStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
 }
 
-func (c connection) Accept() (pipe.Stream, error) {
-	s, err := c.AcceptStream()
+func (c connection) AcceptStream() (pipe.Stream, error) {
+	s, err := c.Session.AcceptStream()
 	x, cancel := context.WithCancel(c.Context())
 	return stream{c: x, cancel: cancel, Stream: s}, err
 }
@@ -69,7 +61,6 @@ type stream struct {
 }
 
 func (s stream) Context() context.Context { return s.c }
-func (s stream) Endpoint() pipe.Edge      { return edge{s} }
 func (s stream) Close() error {
 	s.cancel()
 	return s.Stream.Close()

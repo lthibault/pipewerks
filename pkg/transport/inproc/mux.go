@@ -72,24 +72,26 @@ func (r *radixMux) DialContext(c context.Context, network, addr string) (net.Con
 	o := getDialback(c) // get the override addr if it's set
 
 	select {
-	case l.ch <- addrOverride{
-		Conn: remote,
-		edge: edge{local: Addr(addr), remote: o},
-	}:
+	case l.ch <- overrideAddrs(remote, Addr(addr), o):
 	case <-c.Done():
 		return nil, c.Err()
 	}
 
+	return overrideAddrs(local, o, Addr(addr)), nil
+}
+
+func overrideAddrs(c net.Conn, local, remote net.Addr) addrOverride {
 	return addrOverride{
-		Conn: local,
-		edge: edge{local: o, remote: Addr(addr)},
-	}, nil
+		Conn:   c,
+		local:  local,
+		remote: remote,
+	}
 }
 
 type addrOverride struct {
-	edge
+	local, remote net.Addr
 	net.Conn
 }
 
-func (o addrOverride) LocalAddr() net.Addr  { return o.edge.Local() }
-func (o addrOverride) RemoteAddr() net.Addr { return o.edge.Remote() }
+func (o addrOverride) LocalAddr() net.Addr  { return o.local }
+func (o addrOverride) RemoteAddr() net.Addr { return o.remote }

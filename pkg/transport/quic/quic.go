@@ -3,9 +3,6 @@ package quic
 import (
 	"context"
 	"crypto/tls"
-	"encoding/binary"
-	"io"
-	"io/ioutil"
 	"net"
 
 	"github.com/SentimensRG/ctx"
@@ -18,51 +15,33 @@ import (
 // Config for QUIC protocol
 type Config = quic.Config
 
+type addresser interface {
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
+}
+
 type conn struct{ quic.Session }
 
 func mkConn(s quic.Session) *conn {
 	return &conn{Session: s}
 }
 
-func (conn *conn) Stream() pipe.Streamer       { return conn }
-func (conn conn) Accept() (pipe.Stream, error) { return conn.Accept() }
-
-func (conn conn) Open() (pipe.Stream, error) {
-	s, err := conn.OpenStream()
-	if err != nil {
-		return nil, errors.Wrap(err, "open stream")
-	}
-
-	var size uint16
-	if err = binary.Read(s, binary.BigEndian, &size); err != nil {
-		return nil, errors.Wrap(err, "read pathsize")
-	}
-
-	path, err := ioutil.ReadAll(io.LimitReader(s, int64(size)))
-	if err != nil {
-		return nil, errors.Wrap(err, "read path")
-	}
-
-	return &stream{
-		path:   string(path),
-		Stream: s,
-		Edge:   conn,
-	}, nil
+func (c conn) AcceptStream() (pipe.Stream, error) {
+	s, err := c.Session.AcceptStream()
+	return stream{Stream: s, addresser: c}, err
 }
 
-func (conn *conn) Endpoint() pipe.Edge { return conn }
-func (conn conn) Local() net.Addr      { return conn.LocalAddr() }
-func (conn conn) Remote() net.Addr     { return conn.RemoteAddr() }
+func (c conn) OpenStream() (pipe.Stream, error) {
+	s, err := c.Session.OpenStream()
+	return stream{Stream: s, addresser: c}, err
+}
 
 type stream struct {
-	path string
 	quic.Stream
-	pipe.Edge
+	addresser
 }
 
-func (s stream) Path() string        { return s.path }
-func (s stream) Endpoint() pipe.Edge { return s.Edge }
-func (s stream) StreamID() uint32    { return uint32(s.Stream.StreamID()) }
+func (s stream) StreamID() uint32 { return uint32(s.Stream.StreamID()) }
 
 // Transport over QUIC
 type Transport struct {
