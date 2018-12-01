@@ -37,14 +37,6 @@ type OnConnect interface {
 	Connected(net.Conn, EndpointType) (net.Conn, error)
 }
 
-// OnConnectFunc is a function that satisfies OnConnect
-type OnConnectFunc func(net.Conn, EndpointType) (net.Conn, error)
-
-// Connected is a callback that is invoked when a raw connection is established
-func (f OnConnectFunc) Connected(c net.Conn, t EndpointType) (net.Conn, error) {
-	return f(c, t)
-}
-
 type listener struct {
 	cb []OnConnect
 	serverMuxAdapter
@@ -167,7 +159,8 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
 	t.cbSlice = []OnConnect{}
-	t.MuxAdapter = MuxConfig{}
+
+	OptMuxAdapter(MuxConfig{})(&t)
 
 	for _, fn := range opt {
 		fn(&t)
