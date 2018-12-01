@@ -11,7 +11,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	// DialEndpoint initiated the connection
+	DialEndpoint EndpointType = true
+	// ListenEndpoint received the connection request
+	ListenEndpoint EndpointType = false
+)
+
+// EndpointType specifies whether the endpoint is a client (dialer) or server
+// (listener).
+type EndpointType bool
+
+// Hijacker is an interface that is satisfied by generic.Transport. It allows
+// users to set callbacks that are invoked after a net.Conn is created, but
+// before the stream muxer starts.
+type Hijacker interface {
+	SetHook(ConnectionHook)
+	RmHook(ConnectionHook)
+}
+
+// ConnectionHook is invoked when the Transport successfully opens a raw
+// net.Conn. It allows user-defined logic to run on the raw connection before
+// the stream muxer starts.
+type ConnectionHook interface {
+	Connected(net.Conn, EndpointType) (net.Conn, error)
+}
+
 type listener struct {
+	hook []ConnectionHook
 	serverMuxAdapter
 	net.Listener
 }
@@ -22,6 +49,13 @@ func (l listener) Accept() (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "listener")
 	}
 
+	// Call the "connected" hook and run user-defined logic
+	for _, h := range l.hook {
+		if raw, err = h.Connected(raw, ListenEndpoint); err != nil {
+			return nil, err
+		}
+	}
+
 	conn, err := l.AdaptServer(raw)
 	if err != nil {
 		raw.Close()
@@ -29,11 +63,6 @@ func (l listener) Accept() (pipe.Conn, error) {
 	}
 
 	return conn, nil
-}
-
-type addresser interface {
-	LocalAddr() net.Addr
-	RemoteAddr() net.Addr
 }
 
 type connection struct{ *yamux.Session }
@@ -66,8 +95,20 @@ func (s stream) Close() error {
 	return s.Stream.Close()
 }
 
+type hookSlice []ConnectionHook
+
+func (hs *hookSlice) SetHook(h ConnectionHook) { *hs = append(*hs, h) }
+func (hs *hookSlice) RmHook(h ConnectionHook) {
+	for i := range *hs {
+		if h == (*hs)[i] {
+			*hs = append((*hs)[:i], (*hs)[i+1:]...)
+		}
+	}
+}
+
 // Transport for any pipe.Conn
 type Transport struct {
+	hookSlice
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -76,17 +117,28 @@ type Transport struct {
 // Listen Generic
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
-	return listener{Listener: l, serverMuxAdapter: t.MuxAdapter}, err
+	return listener{
+		Listener:         l,
+		hook:             t.hookSlice,
+		serverMuxAdapter: t.MuxAdapter,
+	}, err
 }
 
 // Dial Generic
 func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	conn, err := t.NetDialer.DialContext(c, a.Network(), a.String())
+	raw, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	return t.AdaptClient(conn)
+	// Call the "connected" hook and run user-defined logic.
+	for _, h := range t.hookSlice {
+		if raw, err = h.Connected(raw, DialEndpoint); err != nil {
+			return nil, err
+		}
+	}
+
+	return t.AdaptClient(raw)
 }
 
 // MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
@@ -107,13 +159,12 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 // New Generic Transport
 func New(opt ...Option) *Transport {
 	t := new(Transport)
-
-	// defaults
+	t.hookSlice = []ConnectionHook{}
 	t.MuxAdapter = MuxConfig{}
 
-	// overrides
 	for _, fn := range opt {
 		fn(t)
 	}
+
 	return t
 }
