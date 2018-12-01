@@ -157,13 +157,12 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 }
 
 // New Generic Transport
-func New(opt ...Option) *Transport {
-	t := new(Transport)
+func New(opt ...Option) (t Transport) {
 	t.hookSlice = []ConnectionHook{}
 	t.MuxAdapter = MuxConfig{}
 
 	for _, fn := range opt {
-		fn(t)
+		fn(&t)
 	}
 
 	return t

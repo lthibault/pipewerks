@@ -10,7 +10,7 @@ import (
 )
 
 // Transport over TCP
-type Transport struct{ *generic.Transport }
+type Transport struct{ generic.Transport }
 
 // Listen TCP
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
@@ -34,7 +34,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 func New(opt ...Option) (t Transport) {
 	t.Transport = generic.New()
 	for _, fn := range opt {
-		fn(t)
+		fn(&t)
 	}
 	return t
 }
