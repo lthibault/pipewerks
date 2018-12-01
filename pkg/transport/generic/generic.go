@@ -22,23 +22,31 @@ const (
 // (listener).
 type EndpointType bool
 
-// Hijacker is an interface that is satisfied by generic.Transport. It allows
+// ConnectHandler is an interface that is satisfied by generic.Transport. It allows
 // users to set callbacks that are invoked after a net.Conn is created, but
 // before the stream muxer starts.
-type Hijacker interface {
-	SetHook(ConnectionHook)
-	RmHook(ConnectionHook)
+type ConnectHandler interface {
+	Set(OnConnect)
+	Rm(OnConnect)
 }
 
-// ConnectionHook is invoked when the Transport successfully opens a raw
+// OnConnect is invoked when the Transport successfully opens a raw
 // net.Conn. It allows user-defined logic to run on the raw connection before
 // the stream muxer starts.
-type ConnectionHook interface {
+type OnConnect interface {
 	Connected(net.Conn, EndpointType) (net.Conn, error)
 }
 
+// OnConnectFunc is a function that satisfies OnConnect
+type OnConnectFunc func(net.Conn, EndpointType) (net.Conn, error)
+
+// Connected is a callback that is invoked when a raw connection is established
+func (f OnConnectFunc) Connected(c net.Conn, t EndpointType) (net.Conn, error) {
+	return f(c, t)
+}
+
 type listener struct {
-	hook []ConnectionHook
+	cb []OnConnect
 	serverMuxAdapter
 	net.Listener
 }
@@ -49,8 +57,8 @@ func (l listener) Accept() (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "listener")
 	}
 
-	// Call the "connected" hook and run user-defined logic
-	for _, h := range l.hook {
+	// Call the "connected" cb and run user-defined logic
+	for _, h := range l.cb {
 		if raw, err = h.Connected(raw, ListenEndpoint); err != nil {
 			return nil, err
 		}
@@ -95,10 +103,10 @@ func (s stream) Close() error {
 	return s.Stream.Close()
 }
 
-type hookSlice []ConnectionHook
+type cbSlice []OnConnect
 
-func (hs *hookSlice) SetHook(h ConnectionHook) { *hs = append(*hs, h) }
-func (hs *hookSlice) RmHook(h ConnectionHook) {
+func (hs *cbSlice) Set(h OnConnect) { *hs = append(*hs, h) }
+func (hs *cbSlice) Rm(h OnConnect) {
 	for i := range *hs {
 		if h == (*hs)[i] {
 			*hs = append((*hs)[:i], (*hs)[i+1:]...)
@@ -108,7 +116,7 @@ func (hs *hookSlice) RmHook(h ConnectionHook) {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	hookSlice
+	cbSlice
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -119,7 +127,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) 
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{
 		Listener:         l,
-		hook:             t.hookSlice,
+		cb:               t.cbSlice,
 		serverMuxAdapter: t.MuxAdapter,
 	}, err
 }
@@ -131,9 +139,9 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	// Call the "connected" hook and run user-defined logic.
-	for _, h := range t.hookSlice {
-		if raw, err = h.Connected(raw, DialEndpoint); err != nil {
+	// Call the "connected" cb and run user-defined logic.
+	for _, cb := range t.cbSlice {
+		if raw, err = cb.Connected(raw, DialEndpoint); err != nil {
 			return nil, err
 		}
 	}
@@ -158,7 +166,7 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
-	t.hookSlice = []ConnectionHook{}
+	t.cbSlice = []OnConnect{}
 	t.MuxAdapter = MuxConfig{}
 
 	for _, fn := range opt {
