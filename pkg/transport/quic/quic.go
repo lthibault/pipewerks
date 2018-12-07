@@ -43,17 +43,6 @@ type stream struct {
 
 func (s stream) StreamID() uint32 { return uint32(s.Stream.StreamID()) }
 
-type hookSlice []pipe.Hook
-
-func (hs *hookSlice) SetHook(h pipe.Hook) { *hs = append(*hs, h) }
-func (hs *hookSlice) RmHook(h pipe.Hook) {
-	for i := range *hs {
-		if h == (*hs)[i] {
-			*hs = append((*hs)[:i], (*hs)[i+1:]...)
-		}
-	}
-}
-
 // Transport over QUIC
 type Transport struct {
 	q *Config
