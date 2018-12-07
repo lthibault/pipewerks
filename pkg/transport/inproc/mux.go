@@ -69,7 +69,9 @@ func (r *radixMux) DialContext(c context.Context, network, addr string) (net.Con
 		return nil, errors.New("connection refused")
 	}
 
-	o := getDialback(c) // get the override addr if it's set
+	// NOTE: c is the _dial_ context. It is valid for the duration of the Dial
+	// 		 operation. The actual connection must be bound to another context.
+	o := getDialback(context.Background())
 
 	select {
 	case l.ch <- overrideAddrs(remote, Addr(addr), o):
