@@ -62,11 +62,9 @@ func OptAddrSpace(n NameSpace) Option {
 	}
 }
 
-// OptMuxAdapter sets the muxer
-func OptMuxAdapter(x generic.MuxAdapter) Option {
-	return func(t *Transport) (prev Option) {
-		prev = OptMuxAdapter(t.Transport.MuxAdapter)
-		t.Transport.MuxAdapter = x
-		return
+// OptGeneric sets an option on the underlying generic transport
+func OptGeneric(opt generic.Option) Option {
+	return func(t *Transport) Option {
+		return OptGeneric(opt(&t.Transport))
 	}
 }
