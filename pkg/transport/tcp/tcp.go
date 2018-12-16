@@ -39,5 +39,6 @@ func New(opt ...Option) (t Transport) {
 	for _, fn := range opt {
 		fn(&t)
 	}
+
 	return t
 }
