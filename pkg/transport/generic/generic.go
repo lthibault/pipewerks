@@ -22,14 +22,6 @@ const (
 // (listener).
 type EndpointType bool
 
-// ConnectHandler is an interface that is satisfied by generic.Transport. It allows
-// users to set callbacks that are invoked after a net.Conn is created, but
-// before the stream muxer starts.
-type ConnectHandler interface {
-	Set(OnConnect)
-	Rm(OnConnect)
-}
-
 // OnConnect is invoked when the Transport successfully opens a raw
 // net.Conn. It allows user-defined logic to run on the raw connection before
 // the stream muxer starts.
@@ -140,12 +132,6 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 
 	return t.AdaptClient(raw)
 }
-
-// Set a connection callback
-func (t Transport) Set(h OnConnect) { t.cbSlice.Set(h) }
-
-// Rm a connection callback
-func (t Transport) Rm(h OnConnect) { t.cbSlice.Rm(h) }
 
 // MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
 type MuxConfig struct{ *yamux.Config }
