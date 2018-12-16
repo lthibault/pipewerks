@@ -29,8 +29,14 @@ type OnConnect interface {
 	Connected(net.Conn, EndpointType) (net.Conn, error)
 }
 
+type noopConnect struct{}
+
+func (noopConnect) Connected(conn net.Conn, _ EndpointType) (net.Conn, error) {
+	return conn, nil
+}
+
 type listener struct {
-	cb []OnConnect
+	h OnConnect
 	serverMuxAdapter
 	net.Listener
 }
@@ -42,10 +48,8 @@ func (l listener) Accept() (pipe.Conn, error) {
 	}
 
 	// Call the "connected" cb and run user-defined logic
-	for _, h := range l.cb {
-		if raw, err = h.Connected(raw, ListenEndpoint); err != nil {
-			return nil, err
-		}
+	if raw, err = l.h.Connected(raw, ListenEndpoint); err != nil {
+		return nil, err
 	}
 
 	conn, err := l.AdaptServer(raw)
@@ -87,20 +91,9 @@ func (s stream) Close() error {
 	return s.Stream.Close()
 }
 
-type cbSlice []OnConnect
-
-func (hs *cbSlice) Set(h OnConnect) { *hs = append(*hs, h) }
-func (hs *cbSlice) Rm(h OnConnect) {
-	for i := range *hs {
-		if h == (*hs)[i] {
-			*hs = append((*hs)[:i], (*hs)[i+1:]...)
-		}
-	}
-}
-
 // Transport for any pipe.Conn
 type Transport struct {
-	cbSlice
+	h OnConnect
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -111,7 +104,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) 
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{
 		Listener:         l,
-		cb:               t.cbSlice,
+		h:                t.h,
 		serverMuxAdapter: t.MuxAdapter,
 	}, err
 }
@@ -124,10 +117,8 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	}
 
 	// Call the "connected" cb and run user-defined logic.
-	for _, cb := range t.cbSlice {
-		if raw, err = cb.Connected(raw, DialEndpoint); err != nil {
-			return nil, err
-		}
+	if raw, err = t.h.Connected(raw, DialEndpoint); err != nil {
+		return nil, err
 	}
 
 	return t.AdaptClient(raw)
@@ -150,8 +141,8 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
-	t.cbSlice = []OnConnect{}
 
+	OptConnectHandler(noopConnect{})(&t)
 	OptMuxAdapter(MuxConfig{})(&t)
 
 	for _, fn := range opt {
