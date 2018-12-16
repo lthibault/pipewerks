@@ -31,11 +31,13 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 }
 
 // New TCP Transport
-func New(opt ...Option) (t *Transport) {
-	t = new(Transport)
+func New(opt ...Option) (t Transport) {
 	t.Transport = generic.New()
+	t.Transport.NetDialer = new(net.Dialer)
+	t.Transport.NetListener = new(net.ListenConfig)
+
 	for _, fn := range opt {
-		fn(t)
+		fn(&t)
 	}
 	return t
 }
