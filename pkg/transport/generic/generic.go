@@ -141,6 +141,12 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	return t.AdaptClient(raw)
 }
 
+// Set a connection callback
+func (t Transport) Set(h OnConnect) { t.cbSlice.Set(h) }
+
+// Rm a connection callback
+func (t Transport) Rm(h OnConnect) { t.cbSlice.Rm(h) }
+
 // MuxConfig is a MuxAdapter that uses github.com/hashicorp/yamux
 type MuxConfig struct{ *yamux.Config }
 
