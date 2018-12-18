@@ -28,12 +28,10 @@ func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, l pipe.List
 	defer wg.Done()
 
 	conn, err := l.Accept()
-	defer conn.Close()
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
 	s, err := conn.OpenStream()
-	defer s.Close()
 	assert.NoError(t, err)
 
 	_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
@@ -50,12 +48,10 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	defer wg.Done()
 
 	conn, err := tp.Dial(context.Background(), Addr("/test"))
-	defer conn.Close()
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
 	s, err := conn.AcceptStream()
-	defer s.Close()
 	assert.NoError(t, err)
 
 	_, err = io.Copy(s, bytes.NewBuffer([]byte(dialerSends)))
