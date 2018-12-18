@@ -5,8 +5,15 @@ import (
 	"net"
 	"sync"
 
+	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/pkg/errors"
 )
+
+// NameSpace is an address space that encapusulates a set of connections.
+type NameSpace interface {
+	generic.NetListener
+	generic.NetDialer
+}
 
 type lmap struct {
 	sync.RWMutex
@@ -39,7 +46,7 @@ func newMux() (m mux) {
 	return
 }
 
-func (x mux) Listen(c context.Context, network, address string) (net.Listener, error) {
+func (x *mux) Listen(c context.Context, network, address string) (net.Listener, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
@@ -55,7 +62,7 @@ func (x mux) Listen(c context.Context, network, address string) (net.Listener, e
 	return l, nil
 }
 
-func (x mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
+func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
