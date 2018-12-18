@@ -15,34 +15,13 @@ type NameSpace interface {
 	generic.NetDialer
 }
 
-type lmap struct {
+type mux struct {
 	sync.RWMutex
 	m map[string]listener
 }
 
-func (m *lmap) Set(path string, l listener) {
-	m.Lock()
-	m.m[path] = l
-	m.Unlock()
-}
-
-func (m *lmap) Get(path string) (l listener, ok bool) {
-	m.RLock()
-	l, ok = m.m[path]
-	m.RUnlock()
-	return
-}
-
-func (m *lmap) Rm(path string) {
-	m.Lock()
-	delete(m.m, path)
-	m.Unlock()
-}
-
-type mux struct{ m lmap }
-
 func newMux() (m mux) {
-	m.m.m = make(map[string]listener)
+	m.m = make(map[string]listener)
 	return
 }
 
@@ -52,13 +31,17 @@ func (x *mux) Listen(c context.Context, network, address string) (net.Listener, 
 	}
 
 	l := listener{
-		a:       Addr(address),
-		ch:      make(chan net.Conn),
-		cq:      make(chan struct{}),
-		release: func() { x.m.Rm(address) },
+		a:  Addr(address),
+		ch: make(chan net.Conn),
+		cq: make(chan struct{}),
+		release: func() {
+			x.Lock()
+			delete(x.m, address)
+			x.Unlock()
+		},
 	}
 
-	x.m.Set(address, l)
+	x.m[address] = l
 	return l, nil
 }
 
@@ -68,8 +51,10 @@ func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, er
 	}
 
 	local, remote := net.Pipe()
+	x.RLock()
+	defer x.RUnlock()
 
-	l, ok := x.m.Get(addr)
+	l, ok := x.m[addr]
 	if !ok {
 		return nil, errors.New("connection refused")
 	}
