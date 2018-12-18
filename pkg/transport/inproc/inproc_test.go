@@ -82,16 +82,8 @@ func TestIntegration(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(2)
-		t.Parallel()
-
-		go t.Run("Listen", func(t *testing.T) {
-			listenTest(cx, t, &wg, l)
-		})
-
-		go t.Run("Dial", func(t *testing.T) {
-			dialTest(cx, t, &wg, inproc)
-		})
-
+		go listenTest(cx, t, &wg, l)
+		go dialTest(cx, t, &wg, inproc)
 		wg.Wait()
 	})
 
@@ -110,16 +102,8 @@ func TestIntegration(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(2)
-		t.Parallel()
-
-		go t.Run("Listen", func(t *testing.T) {
-			listenTest(cx, t, &wg, l)
-		})
-
-		go t.Run("Dial", func(t *testing.T) {
-			dialTest(cx, t, &wg, inproc)
-		})
-
+		go listenTest(cx, t, &wg, l)
+		go dialTest(cx, t, &wg, inproc)
 		wg.Wait()
 	})
 
