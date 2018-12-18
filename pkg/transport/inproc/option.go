@@ -49,10 +49,10 @@ func OptDialback(a net.Addr) Option {
 	}
 }
 
-// OptAddrSpace sets the namespace for the the Transport
-func OptAddrSpace(n NameSpace) Option {
+// OptNameSpace sets the namespace for the the Transport
+func OptNameSpace(n NameSpace) Option {
 	return func(t *Transport) (prev Option) {
-		prev = OptAddrSpace(namespace{
+		prev = OptNameSpace(namespace{
 			NetListener: t.Transport.NetListener,
 			NetDialer:   t.Transport.NetDialer,
 		})

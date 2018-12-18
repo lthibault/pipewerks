@@ -3,12 +3,16 @@ package inproc
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"net"
 	"sync"
 	"testing"
 	"time"
 
-	pipe "github.com/lthibault/pipewerks/pkg"
+	"github.com/lthibault/pipewerks/pkg"
+
+	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,34 +24,45 @@ const (
 	listenerSendSize = int64(len(listenerSends))
 )
 
-func runListenerTest(cx context.Context, t *testing.T, inproc pipe.Transport) {
-	l, err := inproc.Listen(cx, Addr("/test"))
+func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Transport) {
+	l, err := tp.Listen(c, Addr("/test"))
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 
-	conn, err := l.Accept()
-	assert.NoError(t, err)
-	assert.NotNil(t, conn)
+	go func() {
+		defer wg.Done()
+		defer l.Close()
 
-	s, err := conn.OpenStream()
-	assert.NoError(t, err)
+		conn, err := l.Accept()
+		defer conn.Close()
+		assert.NoError(t, err)
+		assert.NotNil(t, conn)
 
-	_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
-	assert.NoError(t, err)
+		s, err := conn.OpenStream()
+		defer s.Close()
+		assert.NoError(t, err)
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, io.LimitReader(s, dialerSendSize))
-	assert.NoError(t, err)
+		_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
+		assert.NoError(t, err)
 
-	assert.Equal(t, dialerSends, buf.String())
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, io.LimitReader(s, dialerSendSize))
+		assert.NoError(t, err)
+
+		assert.Equal(t, dialerSends, buf.String())
+	}()
 }
 
-func runDialerTest(cx context.Context, t *testing.T, inproc pipe.Transport) {
-	conn, err := inproc.Dial(context.Background(), Addr("/test"))
+func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Transport) {
+	defer wg.Done()
+
+	conn, err := tp.Dial(context.Background(), Addr("/test"))
+	defer conn.Close()
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 
 	s, err := conn.AcceptStream()
+	defer s.Close()
 	assert.NoError(t, err)
 
 	_, err = io.Copy(s, bytes.NewBuffer([]byte(dialerSends)))
@@ -71,51 +86,54 @@ func TestIntegration(t *testing.T) {
 		wg.Add(2)
 		t.Parallel()
 
-		go t.Run("Listen", func(t *testing.T) {
-			defer wg.Done()
-			runListenerTest(cx, t, inproc)
+		t.Run("Listen", func(t *testing.T) {
+			listenTest(cx, t, &wg, inproc)
 		})
 
-		go t.Run("Dial", func(t *testing.T) {
-			defer wg.Done()
-			runDialerTest(cx, t, inproc)
+		t.Run("Dial", func(t *testing.T) {
+			dialTest(cx, t, &wg, inproc)
 		})
 
 		wg.Wait()
 	})
 
-	// t.Run("ConnectHandler", func(t *testing.T) {
-	// 	h := (*testHandler)(t)
-	// 	inproc.Set(h)
-	// 	defer inproc.Rm(h)
+	t.Run("ConnectHandler", func(t *testing.T) {
+		prev := OptGeneric(generic.OptConnectHandler((*testHandler)(t)))(inproc)
+		defer prev(inproc)
 
-	// 	cx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-	// 	defer cancel()
+		cx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		defer cancel()
 
-	// 	t.Parallel()
+		var wg sync.WaitGroup
+		wg.Add(2)
+		t.Parallel()
 
-	// 	go t.Run("Listen", func(t *testing.T) {
-	// 	})
+		t.Run("Listen", func(t *testing.T) {
+			listenTest(cx, t, &wg, inproc)
+		})
 
-	// 	go t.Run("Dial", func(t *testing.T) {
-
-	// 	})
-	// })
+		t.Run("Dial", func(t *testing.T) {
+			dialTest(cx, t, &wg, inproc)
+		})
+	})
 
 }
 
-// type testHandler testing.T
+type testHandler testing.T
 
-// func (t testHandler) Connected(conn net.Conn, et generic.EndpointType) (net.Conn, error) {
-// 	switch et {
-// 	case generic.ListenEndpoint:
-// 		_, err := io.Copy(s, bytes.NewBuffer([]byte(dialerSends)))
-// 		assert.NoError(t, err)
+func (t *testHandler) Connected(conn net.Conn, et generic.EndpointType) (net.Conn, error) {
+	switch et {
+	case generic.ListenEndpoint:
+		_, err := io.Copy(conn, bytes.NewBuffer([]byte(dialerSends)))
+		assert.NoError(t, err)
+	case generic.DialEndpoint:
+		b := new(bytes.Buffer)
+		_, err := io.Copy(b, io.LimitReader(conn, dialerSendSize))
+		assert.NoError(t, err)
+		assert.Equal(t, dialerSends, b.String())
+	default:
+		panic(fmt.Sprintf("unknown endpoint type %v", et))
+	}
 
-// 	case generic.DialEndpoint:
-// 	default:
-// 		panic(fmt.Sprintf("unknown endpoint type %d", et))
-// 	}
-
-// 	return conn, nil
-// }
+	return conn, nil
+}

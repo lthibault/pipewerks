@@ -41,7 +41,7 @@ func New(opt ...Option) (t *Transport) {
 	t.Transport = generic.New()
 
 	OptDialback(Addr("anonymous"))(t)
-	OptAddrSpace(defaultMux)(t)
+	OptNameSpace(defaultMux)(t)
 
 	for _, o := range opt {
 		o(t)
