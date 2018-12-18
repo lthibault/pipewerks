@@ -5,73 +5,71 @@ import (
 	"net"
 	"sync"
 
-	radix "github.com/armon/go-radix"
 	"github.com/pkg/errors"
 )
 
-type radixMux struct {
+type lmap struct {
 	sync.RWMutex
-	r *radix.Tree
+	m map[string]listener
 }
 
-func newMux() *radixMux { return &radixMux{r: radix.New()} }
+func (m *lmap) Set(path string, l listener) {
+	m.Lock()
+	m.m[path] = l
+	m.Unlock()
+}
 
-func (r *radixMux) GetListener(path string) (l listener, ok bool) {
-	r.RLock()
-	defer r.RUnlock()
-
-	var v interface{}
-	if v, ok = r.r.Get(path); ok {
-		l = v.(listener)
-	}
-
+func (m *lmap) Get(path string) (l listener, ok bool) {
+	m.RLock()
+	l, ok = m.m[path]
+	m.RUnlock()
 	return
 }
 
-func (r *radixMux) Listen(c context.Context, network, address string) (net.Listener, error) {
-	r.Lock()
-	defer r.Unlock()
+func (m *lmap) Rm(path string) {
+	m.Lock()
+	delete(m.m, path)
+	m.Unlock()
+}
 
+type mux struct{ m lmap }
+
+func newMux() (m mux) {
+	m.m.m = make(map[string]listener)
+	return
+}
+
+func (x mux) Listen(c context.Context, network, address string) (net.Listener, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
 	l := listener{
-		a:      Addr(address),
-		ch:     make(chan net.Conn),
-		cq:     make(chan struct{}),
-		unbind: r.Unbind,
+		a:       Addr(address),
+		ch:      make(chan net.Conn),
+		cq:      make(chan struct{}),
+		release: func() { x.m.Rm(address) },
 	}
 
-	if v, ok := r.r.Insert(address, l); ok {
-		r.r.Insert(address, v)
-		return nil, errors.New("address already bound")
-	}
-
+	x.m.Set(address, l)
 	return l, nil
 }
 
-func (r *radixMux) Unbind(path string) {
-	r.Lock()
-	r.r.Delete(path)
-	r.Unlock()
-}
-
-func (r *radixMux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
+func (x mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
 	if network != "inproc" {
 		return nil, errors.New("invalid network")
 	}
 
 	local, remote := net.Pipe()
 
-	l, ok := r.GetListener(addr)
+	l, ok := x.m.Get(addr)
 	if !ok {
 		return nil, errors.New("connection refused")
 	}
 
 	// NOTE: c is the _dial_ context. It is valid for the duration of the Dial
 	// 		 operation. The actual connection must be bound to another context.
-	o := getDialback(context.Background())
+	o := getDialback(c)
 
 	select {
 	case l.ch <- overrideAddrs(remote, Addr(addr), o):

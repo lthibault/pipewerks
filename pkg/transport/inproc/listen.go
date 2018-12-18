@@ -6,10 +6,10 @@ import (
 )
 
 type listener struct {
-	cq     chan struct{}
-	ch     chan net.Conn
-	a      Addr
-	unbind func(string)
+	cq      chan struct{}
+	ch      chan net.Conn
+	a       Addr
+	release func()
 }
 
 func (l listener) Addr() net.Addr { return l.a }
@@ -20,7 +20,8 @@ func (l listener) Close() (err error) {
 			err = errors.New("already closed")
 		}
 	}()
-	l.unbind(l.a.String())
+
+	l.release()
 	close(l.cq)
 	close(l.ch)
 	return

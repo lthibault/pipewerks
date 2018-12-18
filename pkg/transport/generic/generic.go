@@ -103,9 +103,9 @@ type Transport struct {
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{
-		Listener:         l,
 		h:                t.h,
 		serverMuxAdapter: t.MuxAdapter,
+		Listener:         l,
 	}, err
 }
 

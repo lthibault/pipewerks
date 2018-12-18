@@ -2,10 +2,8 @@ package inproc
 
 import (
 	"context"
-	"net"
 
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
-	"github.com/pkg/errors"
 )
 
 type ctxKey uint8
@@ -14,7 +12,9 @@ const (
 	keyDialback ctxKey = iota
 )
 
-func setDialback(c context.Context, a Addr) context.Context {
+// SetDialback sets an inproc address in the context that will be reported
+// to the listener as the addr of the remote endpoint.
+func SetDialback(c context.Context, a Addr) context.Context {
 	return context.WithValue(c, keyDialback, a)
 }
 
@@ -34,20 +34,6 @@ var defaultMux = newMux()
 
 // Option for Transport
 type Option func(*Transport) (prev Option)
-
-// OptDialback sets the dialback addr for a transport.  This is useful when
-// dialers are also listening, and need to announce the listen address.
-func OptDialback(a net.Addr) Option {
-	if a.Network() != "inproc" {
-		panic(errors.Errorf("invalid network %s", a.Network()))
-	}
-
-	return func(t *Transport) (prev Option) {
-		prev = OptDialback(t.dialback)
-		t.dialback = Addr(a.String())
-		return
-	}
-}
 
 // OptNameSpace sets the namespace for the the Transport
 func OptNameSpace(n NameSpace) Option {

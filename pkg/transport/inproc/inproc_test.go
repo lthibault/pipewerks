@@ -24,33 +24,26 @@ const (
 	listenerSendSize = int64(len(listenerSends))
 )
 
-func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Transport) {
-	l, err := tp.Listen(c, Addr("/test"))
+func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, l pipe.Listener) {
+	defer wg.Done()
+
+	conn, err := l.Accept()
+	defer conn.Close()
 	assert.NoError(t, err)
-	assert.NotNil(t, l)
+	assert.NotNil(t, conn)
 
-	go func() {
-		defer wg.Done()
-		defer l.Close()
+	s, err := conn.OpenStream()
+	defer s.Close()
+	assert.NoError(t, err)
 
-		conn, err := l.Accept()
-		defer conn.Close()
-		assert.NoError(t, err)
-		assert.NotNil(t, conn)
+	_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
+	assert.NoError(t, err)
 
-		s, err := conn.OpenStream()
-		defer s.Close()
-		assert.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, io.LimitReader(s, dialerSendSize))
+	assert.NoError(t, err)
 
-		_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
-		assert.NoError(t, err)
-
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, io.LimitReader(s, dialerSendSize))
-		assert.NoError(t, err)
-
-		assert.Equal(t, dialerSends, buf.String())
-	}()
+	assert.Equal(t, dialerSends, buf.String())
 }
 
 func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Transport) {
@@ -82,15 +75,20 @@ func TestIntegration(t *testing.T) {
 		cx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 		defer cancel()
 
+		l, err := inproc.Listen(cx, Addr("/test"))
+		assert.NoError(t, err)
+		assert.NotNil(t, l)
+		defer l.Close()
+
 		var wg sync.WaitGroup
 		wg.Add(2)
 		t.Parallel()
 
-		t.Run("Listen", func(t *testing.T) {
-			listenTest(cx, t, &wg, inproc)
+		go t.Run("Listen", func(t *testing.T) {
+			listenTest(cx, t, &wg, l)
 		})
 
-		t.Run("Dial", func(t *testing.T) {
+		go t.Run("Dial", func(t *testing.T) {
 			dialTest(cx, t, &wg, inproc)
 		})
 
@@ -98,23 +96,31 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("ConnectHandler", func(t *testing.T) {
-		prev := OptGeneric(generic.OptConnectHandler((*testHandler)(t)))(inproc)
-		defer prev(inproc)
+		opt := OptGeneric(generic.OptConnectHandler((*testHandler)(t)))
+		prev := opt(&inproc)
+		defer prev(&inproc)
 
 		cx, cancel := context.WithTimeout(context.Background(), time.Second*1)
 		defer cancel()
+
+		l, err := inproc.Listen(cx, Addr("/test"))
+		defer l.Close()
+		assert.NoError(t, err)
+		assert.NotNil(t, l)
 
 		var wg sync.WaitGroup
 		wg.Add(2)
 		t.Parallel()
 
-		t.Run("Listen", func(t *testing.T) {
-			listenTest(cx, t, &wg, inproc)
+		go t.Run("Listen", func(t *testing.T) {
+			listenTest(cx, t, &wg, l)
 		})
 
-		t.Run("Dial", func(t *testing.T) {
+		go t.Run("Dial", func(t *testing.T) {
 			dialTest(cx, t, &wg, inproc)
 		})
+
+		wg.Wait()
 	})
 
 }
