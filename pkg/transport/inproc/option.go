@@ -56,8 +56,10 @@ func OptNameSpace(n NameSpace) Option {
 			NetListener: t.Transport.NetListener,
 			NetDialer:   t.Transport.NetDialer,
 		})
-		t.Transport.NetListener = n
-		t.Transport.NetDialer = n
+
+		generic.OptDialer(n)(&t.Transport)
+		generic.OptListener(n)(&t.Transport)
+
 		return
 	}
 }
