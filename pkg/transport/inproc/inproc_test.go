@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/lthibault/pipewerks/pkg"
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 	"github.com/stretchr/testify/assert"
@@ -34,14 +36,23 @@ func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, l pipe.List
 	s, err := conn.OpenStream()
 	assert.NoError(t, err)
 
-	_, err = io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
-	assert.NoError(t, err)
+	var g errgroup.Group
+	g.Go(func() error {
+		_, err := io.Copy(s, bytes.NewBuffer([]byte(listenerSends)))
+		return errors.Wrap(err, "listener send")
+	})
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, io.LimitReader(s, dialerSendSize))
-	assert.NoError(t, err)
+	g.Go(func() error {
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, io.LimitReader(s, dialerSendSize)); err != nil {
+			return errors.Wrap(err, "listener recv")
+		}
 
-	assert.Equal(t, dialerSends, buf.String())
+		assert.Equal(t, dialerSends, buf.String())
+		return nil
+	})
+
+	assert.NoError(t, g.Wait())
 }
 
 func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Transport) {
@@ -54,14 +65,24 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	s, err := conn.AcceptStream()
 	assert.NoError(t, err)
 
-	_, err = io.Copy(s, bytes.NewBuffer([]byte(dialerSends)))
-	assert.NoError(t, err)
+	var g errgroup.Group
 
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, io.LimitReader(s, listenerSendSize))
-	assert.NoError(t, err)
+	g.Go(func() error {
+		_, err := io.Copy(s, bytes.NewBuffer([]byte(dialerSends)))
+		return errors.Wrap(err, "dialer send")
+	})
 
-	assert.Equal(t, listenerSends, buf.String())
+	g.Go(func() error {
+		buf := new(bytes.Buffer)
+		if _, err := io.Copy(buf, io.LimitReader(s, listenerSendSize)); err != nil {
+			return errors.Wrap(err, "dialer recv")
+		}
+
+		assert.Equal(t, listenerSends, buf.String())
+		return nil
+	})
+
+	assert.NoError(t, g.Wait())
 }
 
 func TestIntegration(t *testing.T) {
