@@ -47,11 +47,6 @@ func (l listener) Accept() (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "listener")
 	}
 
-	// Call the "connected" cb and run user-defined logic
-	if raw, err = l.h.Connected(raw, ListenEndpoint); err != nil {
-		return nil, err
-	}
-
 	conn, err := l.AdaptServer(raw)
 	if err != nil {
 		raw.Close()
@@ -93,7 +88,6 @@ func (s stream) Close() error {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	h OnConnect
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -103,7 +97,6 @@ type Transport struct {
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{
-		h:                t.h,
 		serverMuxAdapter: t.MuxAdapter,
 		Listener:         l,
 	}, err
@@ -114,11 +107,6 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	raw, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
-	}
-
-	// Call the "connected" cb and run user-defined logic.
-	if raw, err = t.h.Connected(raw, DialEndpoint); err != nil {
-		return nil, err
 	}
 
 	return t.AdaptClient(raw)
@@ -142,7 +130,6 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
 
-	OptConnectHandler(noopConnect{})(&t)
 	OptMuxAdapter(MuxConfig{})(&t)
 
 	for _, fn := range opt {
