@@ -26,7 +26,7 @@ func newMux() (m mux) {
 }
 
 func (x *mux) Listen(c context.Context, network, address string) (net.Listener, error) {
-	if network != "inproc" {
+	if network != "" {
 		return nil, errors.New("invalid network")
 	}
 
@@ -46,7 +46,7 @@ func (x *mux) Listen(c context.Context, network, address string) (net.Listener, 
 }
 
 func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
-	if network != "inproc" {
+	if network != "" {
 		return nil, errors.New("invalid network")
 	}
 

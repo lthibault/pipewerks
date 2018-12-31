@@ -8,7 +8,7 @@ import (
 type Addr string
 
 // Network satisfies net.Addr
-func (Addr) Network() string  { return "inproc" }
+func (Addr) Network() string  { return "" }
 func (a Addr) String() string { return string(a) }
 
 // Transport bytes around the process
