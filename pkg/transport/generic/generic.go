@@ -11,32 +11,29 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	// DialEndpoint initiated the connection
-	DialEndpoint EndpointType = true
-	// ListenEndpoint received the connection request
-	ListenEndpoint EndpointType = false
-)
-
-// EndpointType specifies whether the endpoint is a client (dialer) or server
-// (listener).
-type EndpointType bool
-
-// OnConnect is invoked when the Transport successfully opens a raw
+// ConnectHook is invoked when the Transport successfully opens a raw
 // net.Conn. It allows user-defined logic to run on the raw connection before
 // the stream muxer starts.
-type OnConnect interface {
-	Connected(net.Conn, EndpointType) (net.Conn, error)
+type ConnectHook interface {
+	// OnDialConnected is called when a dialer successfully connects to a remote
+	// listener.  The context is the same as the one passed to Dial(), and may
+	// be expired.  Users SHOULD NOT abort a connection due to an expired context.
+	OnDialConnected(context.Context, net.Conn) (net.Conn, error)
+	OnListenConnected(net.Conn) (net.Conn, error)
 }
 
 type noopConnect struct{}
 
-func (noopConnect) Connected(conn net.Conn, _ EndpointType) (net.Conn, error) {
+func (noopConnect) OnDialConnected(_ context.Context, conn net.Conn) (net.Conn, error) {
+	return conn, nil
+}
+
+func (noopConnect) OnListenConnected(conn net.Conn) (net.Conn, error) {
 	return conn, nil
 }
 
 type listener struct {
-	h OnConnect
+	h ConnectHook
 	serverMuxAdapter
 	net.Listener
 }
@@ -47,8 +44,7 @@ func (l listener) Accept() (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "listener")
 	}
 
-	// Call the "connected" cb and run user-defined logic
-	if raw, err = l.h.Connected(raw, ListenEndpoint); err != nil {
+	if raw, err = l.h.OnListenConnected(raw); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +89,7 @@ func (s stream) Close() error {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	h OnConnect
+	h ConnectHook
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -116,8 +112,7 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	// Call the "connected" cb and run user-defined logic.
-	if raw, err = t.h.Connected(raw, DialEndpoint); err != nil {
+	if raw, err = t.h.OnDialConnected(c, raw); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +137,7 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
 
-	OptConnectHandler(noopConnect{})(&t)
+	OptConnectHook(noopConnect{})(&t)
 	OptMuxAdapter(MuxConfig{})(&t)
 
 	for _, fn := range opt {
