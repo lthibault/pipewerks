@@ -110,14 +110,14 @@ func TestIntegrationParallel(t *testing.T) {
 
 	t.Run("Parallel", func(t *testing.T) {
 		t.Parallel()
-		n := 2
+		n := 1
 
-		l, err := inproc.Listen(context.Background(), Addr("/test/parallel/listen"))
+		l, err := inproc.Listen(context.Background(), Addr("/parallel/listen"))
 		assert.NoError(t, err)
 		assert.NotNil(t, l)
 
 		go t.Run("Server", func(t *testing.T) {
-			defer func() { assert.NoError(t, l.Close()) }()
+			// defer func() { assert.NoError(t, l.Close()) }()
 
 			var wg sync.WaitGroup
 			wg.Add(n)
@@ -125,7 +125,7 @@ func TestIntegrationParallel(t *testing.T) {
 			for i := 0; i < n; i++ {
 				conn, err := l.Accept()
 				assert.NoError(t, err)
-				defer conn.Close()
+				// defer conn.Close()
 
 				t.Fatal(conn)
 
@@ -133,7 +133,7 @@ func TestIntegrationParallel(t *testing.T) {
 				assert.NoError(t, err)
 
 				go func() {
-					defer s.Close()
+					// defer s.Close()
 
 					var payload int8
 					assert.NoError(t, binary.Read(s, binary.BigEndian, &payload))
@@ -156,13 +156,13 @@ func TestIntegrationParallel(t *testing.T) {
 				go t.Run(name, func(t *testing.T) {
 					defer wg.Done()
 
-					conn, err := inproc.Dial(context.Background(), Addr("/test/parallel/listen"))
+					conn, err := inproc.Dial(context.Background(), Addr("/parallel/listen"))
 					assert.NoError(t, err)
-					defer conn.Close()
+					// defer conn.Close()
 
 					s, err := conn.OpenStream()
 					assert.NoError(t, err)
-					defer s.Close()
+					// defer s.Close()
 
 					var echo int8
 					assert.NoError(t, binary.Write(s, binary.BigEndian, i))

@@ -90,3 +90,19 @@ func TestMuxConfig(t *testing.T) {
 		})
 	})
 }
+
+func TestConnection(t *testing.T) {
+	yc, c := net.Pipe()
+
+	dsess, err := yamux.Client(c, nil)
+	assert.NoError(t, err)
+
+	lsess, err := yamux.Server(yc, nil)
+	assert.NoError(t, err)
+
+	conn := connection{lsess}
+	assert.NoError(t, conn.Context().Err())
+
+	assert.NoError(t, dsess.Close())
+	assert.Error(t, conn.Context().Err())
+}
