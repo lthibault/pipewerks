@@ -1,6 +1,7 @@
 package inproc
 
 import (
+	"context"
 	"errors"
 	"net"
 	"sync"
@@ -48,4 +49,22 @@ func (l *listener) Accept() (net.Conn, error) {
 	}
 
 	return nil, errors.New("closed")
+}
+
+func (l *listener) connect(c context.Context, conn net.Conn) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("closed")
+		}
+	}()
+
+	select {
+	case <-c.Done():
+		err = c.Err()
+	case <-l.cq:
+		err = errors.New("connection refused")
+	case l.ch <- conn:
+	}
+
+	return
 }

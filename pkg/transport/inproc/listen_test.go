@@ -1,6 +1,7 @@
 package inproc
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -29,6 +30,46 @@ func TestListener(t *testing.T) {
 			assert.Error(t, l.Close())
 		})
 
+	})
+
+	t.Run("Connect", func(t *testing.T) {
+		l := newListener(Addr("/test"), func() {})
+
+		t.Run("Success", func(t *testing.T) {
+			go func() { <-l.ch }()
+			assert.NoError(t, l.connect(context.Background(), nil))
+		})
+
+		t.Run("DialContextExpired", func(t *testing.T) {
+			c, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			cq := make(chan struct{})
+			defer close(cq)
+			go func() {
+				select {
+				case <-l.ch:
+				case <-cq:
+				}
+			}()
+
+			assert.EqualError(t, l.connect(c, nil), context.Canceled.Error())
+		})
+
+		t.Run("Closed", func(t *testing.T) {
+			l.Close()
+
+			cq := make(chan struct{})
+			defer close(cq)
+			go func() {
+				select {
+				case <-l.ch:
+				case <-cq:
+				}
+			}()
+
+			assert.EqualError(t, l.connect(context.Background(), nil), "connection refused")
+		})
 	})
 
 	t.Run("Accept", func(t *testing.T) {

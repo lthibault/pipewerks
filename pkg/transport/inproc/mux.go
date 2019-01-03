@@ -58,14 +58,9 @@ func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, er
 		return nil, errors.New("connection refused")
 	}
 
-	// NOTE: c is the _dial_ context. It is valid for the duration of the Dial
-	// 		 operation. The actual connection must be bound to another context.
 	o := getDialback(c)
-
-	select {
-	case l.ch <- overrideAddrs(remote, Addr(addr), o):
-	case <-c.Done():
-		return nil, c.Err()
+	if err := l.connect(c, overrideAddrs(remote, Addr(addr), o)); err != nil {
+		return nil, err
 	}
 
 	return overrideAddrs(local, o, Addr(addr)), nil

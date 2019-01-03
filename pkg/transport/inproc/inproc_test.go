@@ -3,9 +3,12 @@ package inproc
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
@@ -83,6 +86,7 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	})
 
 	assert.NoError(t, g.Wait())
+	<-time.After(time.Millisecond) // give the listener time to read
 }
 
 func integrationTest(c context.Context, t *testing.T, tp pipe.Transport, addr string) {
@@ -97,40 +101,77 @@ func integrationTest(c context.Context, t *testing.T, tp pipe.Transport, addr st
 	go dialTest(c, t, &wg, tp)
 	wg.Wait()
 }
+func TestItegration(t *testing.T) {
+	integrationTest(context.Background(), t, New(), "/test")
+}
 
-func TestIntegration(t *testing.T) {
+func TestIntegrationParallel(t *testing.T) {
 	inproc := New()
 
-	t.Run("Single", func(t *testing.T) {
-		integrationTest(context.Background(), t, inproc, "/test")
+	t.Run("Parallel", func(t *testing.T) {
+		t.Parallel()
+		n := 2
+
+		l, err := inproc.Listen(context.Background(), Addr("/test/parallel/listen"))
+		assert.NoError(t, err)
+		assert.NotNil(t, l)
+
+		go t.Run("Server", func(t *testing.T) {
+			defer func() { assert.NoError(t, l.Close()) }()
+
+			var wg sync.WaitGroup
+			wg.Add(n)
+
+			for i := 0; i < n; i++ {
+				conn, err := l.Accept()
+				assert.NoError(t, err)
+				defer conn.Close()
+
+				t.Fatal(conn)
+
+				s, err := conn.AcceptStream()
+				assert.NoError(t, err)
+
+				go func() {
+					defer s.Close()
+
+					var payload int8
+					assert.NoError(t, binary.Read(s, binary.BigEndian, &payload))
+					assert.NoError(t, binary.Write(s, binary.BigEndian, payload))
+				}()
+
+				wg.Wait()
+				<-time.After(time.Millisecond * 10) // TODO: try removing when working
+			}
+		})
+
+		// Clients
+		var wg sync.WaitGroup
+		wg.Add(n)
+
+		for i := 0; i < n; i++ {
+			name := fmt.Sprintf("client-%d", i)
+
+			func(i int8) {
+				go t.Run(name, func(t *testing.T) {
+					defer wg.Done()
+
+					conn, err := inproc.Dial(context.Background(), Addr("/test/parallel/listen"))
+					assert.NoError(t, err)
+					defer conn.Close()
+
+					s, err := conn.OpenStream()
+					assert.NoError(t, err)
+					defer s.Close()
+
+					var echo int8
+					assert.NoError(t, binary.Write(s, binary.BigEndian, i))
+					assert.NoError(t, binary.Read(s, binary.BigEndian, &echo))
+					assert.Equal(t, i, echo)
+				})
+			}(int8(i))
+		}
+
+		wg.Wait()
 	})
-
-	// t.Run("Parallel", func(t *testing.T) {
-	// 	n := 100
-	// 	var wg sync.WaitGroup
-	// 	wg.Add(n)
-
-	// 	t.Parallel()
-
-	// 	for i := 0; i < n; i++ {
-	// 		func(i int) {
-	// 			defer wg.Done()
-	// 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-	// 				l, err := inproc.Listen(cx, Addr(fmt.Sprintf("/%d", i)))
-	// 				assert.NoError(t, err)
-	// 				assert.NotNil(t, l)
-	// 				defer l.Close()
-
-	// 				var wg sync.WaitGroup
-	// 				wg.Add(2)
-	// 				go listenTest(cx, t, &wg, l)
-	// 				go dialTest(cx, t, &wg, inproc)
-	// 				wg.Wait()
-	// 			})
-	// 		}(i)
-	// 	}
-
-	// 	wg.Wait()
-
-	// })
 }
