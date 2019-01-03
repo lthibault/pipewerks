@@ -41,13 +41,9 @@ func (l *listener) Close() (err error) {
 func (l *listener) Accept() (net.Conn, error) {
 	select {
 	case <-l.cq:
-		break
 	default:
-		select {
-		case conn := <-l.ch:
+		if conn, ok := <-l.ch; ok {
 			return conn, nil
-		case <-l.cq:
-			break
 		}
 	}
 

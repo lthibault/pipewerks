@@ -2,6 +2,7 @@ package inproc
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -47,6 +48,8 @@ func TestListener(t *testing.T) {
 					_, err := l.Accept()
 					ch <- err
 				}()
+
+				<-time.After(time.Millisecond) // wait for goroutine to block
 
 				l.Close()
 				assert.Error(t, <-ch)
