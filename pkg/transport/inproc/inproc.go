@@ -4,11 +4,13 @@ import (
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 )
 
+const netInproc = ""
+
 // Addr for inproc transport
 type Addr string
 
 // Network satisfies net.Addr
-func (Addr) Network() string  { return "" }
+func (Addr) Network() string  { return netInproc }
 func (a Addr) String() string { return string(a) }
 
 // Transport bytes around the process

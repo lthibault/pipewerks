@@ -3,38 +3,53 @@ package inproc
 import (
 	"errors"
 	"net"
+	"sync"
 )
 
 type listener struct {
+	o       sync.Once
 	cq      chan struct{}
 	ch      chan net.Conn
 	a       Addr
 	release func()
 }
 
-func (l listener) Addr() net.Addr { return l.a }
+func newListener(a Addr, gc func()) *listener {
+	return &listener{
+		a:       a,
+		ch:      make(chan net.Conn),
+		cq:      make(chan struct{}),
+		release: gc,
+	}
+}
 
-func (l listener) Close() (err error) {
-	defer func() {
-		if recover() != nil {
-			err = errors.New("already closed")
-		}
-	}()
+func (l *listener) Addr() net.Addr { return l.a }
 
-	l.release()
-	close(l.cq)
-	close(l.ch)
+func (l *listener) Close() (err error) {
+	err = errors.New("already closed")
+
+	l.o.Do(func() {
+		close(l.cq)
+		close(l.ch)
+		l.release()
+		err = nil
+	})
+
 	return
 }
 
-func (l listener) Accept() (net.Conn, error) {
+func (l *listener) Accept() (net.Conn, error) {
 	select {
-	case conn, ok := <-l.ch:
-		if !ok {
-			return nil, errors.New("closed")
-		}
-		return conn, nil
 	case <-l.cq:
-		return nil, errors.New("closed")
+		break
+	default:
+		select {
+		case conn := <-l.ch:
+			return conn, nil
+		case <-l.cq:
+			break
+		}
 	}
+
+	return nil, errors.New("closed")
 }

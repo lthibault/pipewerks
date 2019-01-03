@@ -17,36 +17,35 @@ type NameSpace interface {
 
 type mux struct {
 	sync.RWMutex
-	m map[string]listener
+	m map[string]*listener
 }
 
 func newMux() (m mux) {
-	m.m = make(map[string]listener)
+	m.m = make(map[string]*listener)
 	return
 }
 
+func (x *mux) gc(addr string) func() {
+	return func() {
+		x.Lock()
+		delete(x.m, addr)
+		x.Unlock()
+	}
+}
+
 func (x *mux) Listen(c context.Context, network, address string) (net.Listener, error) {
-	if network != "" {
+	if network != netInproc {
 		return nil, errors.New("invalid network")
 	}
 
-	l := listener{
-		a:  Addr(address),
-		ch: make(chan net.Conn),
-		cq: make(chan struct{}),
-		release: func() {
-			x.Lock()
-			delete(x.m, address)
-			x.Unlock()
-		},
-	}
+	l := newListener(Addr(address), x.gc(address))
 
 	x.m[address] = l
 	return l, nil
 }
 
 func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
-	if network != "" {
+	if network != netInproc {
 		return nil, errors.New("invalid network")
 	}
 
