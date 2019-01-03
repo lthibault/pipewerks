@@ -6,7 +6,6 @@ import (
 	"io"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
@@ -29,9 +28,11 @@ func listenTest(c context.Context, t *testing.T, wg *sync.WaitGroup, l pipe.List
 	conn, err := l.Accept()
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
+	defer func() { assert.NoError(t, conn.Close()) }()
 
 	s, err := conn.OpenStream()
 	assert.NoError(t, err)
+	defer func() { assert.NoError(t, s.Close()) }()
 
 	var g errgroup.Group
 	g.Go(func() error {
@@ -58,9 +59,11 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	conn, err := tp.Dial(context.Background(), Addr("/test"))
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
+	defer func() { assert.NoError(t, conn.Close()) }()
 
 	s, err := conn.AcceptStream()
 	assert.NoError(t, err)
+	defer func() { assert.NoError(t, s.Close()) }()
 
 	var g errgroup.Group
 
@@ -82,20 +85,52 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	assert.NoError(t, g.Wait())
 }
 
-func TestIntegration(t *testing.T) {
-	inproc := New()
-
-	cx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-	defer cancel()
-
-	l, err := inproc.Listen(cx, Addr("/test"))
+func integrationTest(c context.Context, t *testing.T, tp pipe.Transport, addr string) {
+	l, err := tp.Listen(c, Addr(addr))
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
-	defer l.Close()
+	defer func() { assert.NoError(t, l.Close()) }()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go listenTest(cx, t, &wg, l)
-	go dialTest(cx, t, &wg, inproc)
+	go listenTest(c, t, &wg, l)
+	go dialTest(c, t, &wg, tp)
 	wg.Wait()
+}
+
+func TestIntegration(t *testing.T) {
+	inproc := New()
+
+	t.Run("Single", func(t *testing.T) {
+		integrationTest(context.Background(), t, inproc, "/test")
+	})
+
+	// t.Run("Parallel", func(t *testing.T) {
+	// 	n := 100
+	// 	var wg sync.WaitGroup
+	// 	wg.Add(n)
+
+	// 	t.Parallel()
+
+	// 	for i := 0; i < n; i++ {
+	// 		func(i int) {
+	// 			defer wg.Done()
+	// 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+	// 				l, err := inproc.Listen(cx, Addr(fmt.Sprintf("/%d", i)))
+	// 				assert.NoError(t, err)
+	// 				assert.NotNil(t, l)
+	// 				defer l.Close()
+
+	// 				var wg sync.WaitGroup
+	// 				wg.Add(2)
+	// 				go listenTest(cx, t, &wg, l)
+	// 				go dialTest(cx, t, &wg, inproc)
+	// 				wg.Wait()
+	// 			})
+	// 		}(i)
+	// 	}
+
+	// 	wg.Wait()
+
+	// })
 }
