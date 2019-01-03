@@ -56,12 +56,3 @@ func OptMuxAdapter(x MuxAdapter) Option {
 		return
 	}
 }
-
-// OptConnectHook sets a connection callback handler
-func OptConnectHook(h ConnectHook) Option {
-	return func(t *Transport) (prev Option) {
-		prev = OptConnectHook(t.h)
-		t.h = h
-		return
-	}
-}

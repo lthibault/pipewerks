@@ -11,29 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ConnectHook is invoked when the Transport successfully opens a raw
-// net.Conn. It allows user-defined logic to run on the raw connection before
-// the stream muxer starts.
-type ConnectHook interface {
-	// OnDialConnected is called when a dialer successfully connects to a remote
-	// listener.  The context is the same as the one passed to Dial(), and may
-	// be expired.  Users SHOULD NOT abort a connection due to an expired context.
-	OnDialConnected(context.Context, net.Conn) (net.Conn, error)
-	OnListenConnected(net.Conn) (net.Conn, error)
-}
-
-type noopConnect struct{}
-
-func (noopConnect) OnDialConnected(_ context.Context, conn net.Conn) (net.Conn, error) {
-	return conn, nil
-}
-
-func (noopConnect) OnListenConnected(conn net.Conn) (net.Conn, error) {
-	return conn, nil
-}
-
 type listener struct {
-	h ConnectHook
 	serverMuxAdapter
 	net.Listener
 }
@@ -42,10 +20,6 @@ func (l listener) Accept() (pipe.Conn, error) {
 	raw, err := l.Listener.Accept()
 	if err != nil {
 		return nil, errors.Wrap(err, "listener")
-	}
-
-	if raw, err = l.h.OnListenConnected(raw); err != nil {
-		return nil, err
 	}
 
 	conn, err := l.AdaptServer(raw)
@@ -89,7 +63,6 @@ func (s stream) Close() error {
 
 // Transport for any pipe.Conn
 type Transport struct {
-	h ConnectHook
 	MuxAdapter
 	NetListener
 	NetDialer
@@ -99,7 +72,6 @@ type Transport struct {
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	l, err := t.NetListener.Listen(c, a.Network(), a.String())
 	return listener{
-		h:                t.h,
 		serverMuxAdapter: t.MuxAdapter,
 		Listener:         l,
 	}, err
@@ -110,10 +82,6 @@ func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	raw, err := t.NetDialer.DialContext(c, a.Network(), a.String())
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
-	}
-
-	if raw, err = t.h.OnDialConnected(c, raw); err != nil {
-		return nil, err
 	}
 
 	return t.AdaptClient(raw)
@@ -137,9 +105,7 @@ func (c MuxConfig) AdaptClient(conn net.Conn) (pipe.Conn, error) {
 // New Generic Transport
 func New(opt ...Option) (t Transport) {
 
-	OptConnectHook(noopConnect{})(&t)
 	OptMuxAdapter(MuxConfig{})(&t)
-
 	for _, fn := range opt {
 		fn(&t)
 	}
