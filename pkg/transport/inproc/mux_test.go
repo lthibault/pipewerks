@@ -1,7 +1,9 @@
 package inproc
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 
@@ -35,4 +37,43 @@ func TestMux(t *testing.T) {
 		assert.Empty(t, m.m)
 	})
 
+	t.Run("Listen", func(t *testing.T) {
+		t.Run("CheckNetwork", func(t *testing.T) {
+			_, err := m.Listen(context.Background(), "invalid", "")
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("Dial", func(t *testing.T) {
+		t.Run("CheckNetwork", func(t *testing.T) {
+			_, err := m.DialContext(context.Background(), "invalid", "")
+			assert.Error(t, err)
+		})
+
+		t.Run("NoListener", func(t *testing.T) {
+			_, err := m.DialContext(context.Background(), "", "/fail")
+			assert.Error(t, err)
+		})
+
+		t.Run("ContextExpired", func(t *testing.T) {
+			c, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			m.m["/fail"] = &listener{}
+			defer delete(m.m, "/fail")
+
+			_, err := m.DialContext(c, "", "/fail")
+			assert.EqualError(t, err, context.Canceled.Error())
+		})
+	})
+}
+
+func TestAddrOverride(t *testing.T) {
+	local := Addr("/local")
+	remote := Addr("/remote")
+	_, conn := net.Pipe()
+
+	c := addrOverride{Conn: conn, local: local, remote: remote}
+	assert.Equal(t, remote, c.RemoteAddr())
+	assert.Equal(t, local, c.LocalAddr())
 }
