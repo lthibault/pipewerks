@@ -35,7 +35,7 @@ func (x *mux) gc(addr string) func() {
 
 func (x *mux) Listen(c context.Context, network, address string) (net.Listener, error) {
 	if network != netInproc {
-		return nil, errors.New("invalid network")
+		return nil, errors.Errorf("%s: invalid network %s", netInproc, network)
 	}
 
 	l := newListener(Addr(address), x.gc(address))
@@ -46,7 +46,7 @@ func (x *mux) Listen(c context.Context, network, address string) (net.Listener, 
 
 func (x *mux) DialContext(c context.Context, network, addr string) (net.Conn, error) {
 	if network != netInproc {
-		return nil, errors.New("invalid network")
+		return nil, errors.Errorf("%s: invalid network %s", netInproc, network)
 	}
 
 	local, remote := net.Pipe()

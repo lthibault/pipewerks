@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/SentimensRG/ctx"
-	log "github.com/lthibault/log/pkg"
 	pipe "github.com/lthibault/pipewerks/pkg"
 	quic "github.com/lucas-clemente/quic-go"
 	"github.com/pkg/errors"
@@ -51,21 +50,23 @@ type Transport struct {
 
 // Dial the specified address
 func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	log.Get(c).Debug("dialing")
+	if a.Network() != "udp" {
+		return nil, errors.Errorf("quic: invalid network %s", a.Network())
+	}
 
 	sess, err := quic.DialAddrContext(c, a.String(), t.t, t.q)
 	if err != nil {
 		return nil, errors.Wrap(err, "dial")
 	}
 
-	log.Get(c).Debug("negotiating")
-
 	return mkConn(sess), nil
 }
 
 // Listen on the specified address
 func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
-	log.Get(c).Debug("listening")
+	if a.Network() != "udp" {
+		return nil, errors.Errorf("quic: invalid network %s", a.Network())
+	}
 
 	l, err := quic.ListenAddr(a.String(), t.t, t.q)
 	if err != nil {

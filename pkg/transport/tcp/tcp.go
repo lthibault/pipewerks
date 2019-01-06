@@ -15,7 +15,7 @@ type Transport struct{ generic.Transport }
 // Listen TCP
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
 	if a.Network() != "tcp" {
-		return nil, errors.New("invalid network")
+		return nil, errors.Errorf("tcp: invalid network %s", a.Network())
 	}
 
 	return t.Transport.Listen(c, a)
@@ -24,7 +24,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) 
 // Dial TCP
 func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	if a.Network() != "tcp" {
-		return nil, errors.New("invalid network")
+		return nil, errors.Errorf("tcp: invalid network %s", a.Network())
 	}
 
 	return t.Transport.Dial(c, a)
