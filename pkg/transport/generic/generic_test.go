@@ -1,12 +1,15 @@
 package generic
 
 import (
-	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/yamux"
+	pipe "github.com/lthibault/pipewerks/pkg"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
 type mockListener struct {
@@ -103,6 +106,101 @@ func TestConnection(t *testing.T) {
 	conn := connection{lsess}
 	assert.NoError(t, conn.Context().Err())
 
-	assert.NoError(t, dsess.Close())
-	assert.Error(t, conn.Context().Err())
+	t.Run("Close", func(t *testing.T) {
+		assert.NoError(t, dsess.Close())
+		time.Sleep(time.Millisecond)
+
+		assert.Error(t, conn.Context().Err())
+		assert.True(t, func() bool {
+			select {
+			case <-conn.Context().Done():
+				return true
+			default:
+				return false
+			}
+		}())
+	})
+
+}
+
+func mkConn() (pipe.Conn, pipe.Conn, error) {
+	ds, ls := net.Pipe()
+
+	dsess, err := yamux.Client(ds, nil)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "client conn")
+	}
+
+	lsess, err := yamux.Server(ls, nil)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "server conn")
+	}
+
+	return connection{dsess}, connection{lsess}, nil
+}
+
+func TestStream(t *testing.T) {
+	dc, lc, err := mkConn()
+	assert.NoError(t, err, "canary failed")
+
+	var ds, ls pipe.Stream
+	var g errgroup.Group
+	g.Go(func() (err error) {
+		ds, err = dc.OpenStream()
+		return
+	})
+	g.Go(func() (err error) {
+		ls, err = lc.AcceptStream()
+		return
+	})
+	assert.NoError(t, g.Wait())
+
+	t.Run("ChanValid", func(t *testing.T) {
+		t.Run("DialStream", func(t *testing.T) {
+			assert.NoError(t, ds.Context().Err())
+
+			select {
+			case <-ds.Context().Done():
+				t.Error("channel recved on active stream")
+			default:
+			}
+		})
+
+		t.Run("ListenStream", func(t *testing.T) {
+			assert.NoError(t, ls.Context().Err())
+
+			select {
+			case <-ls.Context().Done():
+				t.Error("channel recved on active stream")
+			default:
+			}
+		})
+	})
+
+	t.Run("Close", func(t *testing.T) {
+		assert.NoError(t, ds.Close())
+		assert.NoError(t, dc.Context().Err())
+		assert.NoError(t, lc.Context().Err())
+
+		t.Run("DialStream", func(t *testing.T) {
+			assert.Error(t, ds.Context().Err())
+			select {
+			case <-ds.Context().Done():
+			default:
+				t.Error("dial closed, but context not expired")
+			}
+		})
+
+		t.Run("ListenStream", func(t *testing.T) {
+			_, err := ls.Read([]byte{}) // ensure context closure is triggered
+			assert.Error(t, err)
+
+			assert.Error(t, ls.Context().Err())
+			select {
+			case <-ls.Context().Done():
+			default:
+				t.Error("dial closed, but context not expired")
+			}
+		})
+	})
 }

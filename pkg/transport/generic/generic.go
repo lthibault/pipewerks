@@ -3,6 +3,7 @@ package generic
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/SentimensRG/ctx"
 	pipe "github.com/lthibault/pipewerks/pkg"
@@ -39,26 +40,87 @@ func (c connection) Context() context.Context {
 
 func (c connection) OpenStream() (pipe.Stream, error) {
 	s, err := c.Session.OpenStream()
-	x, cancel := context.WithCancel(c.Context())
-	return stream{c: x, cancel: cancel, Stream: s}, err
+	if err != nil {
+		return nil, err
+	}
+
+	return mkStream(c.Context(), s), nil
 }
 
 func (c connection) AcceptStream() (pipe.Stream, error) {
 	s, err := c.Session.AcceptStream()
-	x, cancel := context.WithCancel(c.Context())
-	return stream{c: x, cancel: cancel, Stream: s}, err
+	if err != nil {
+		return nil, err
+	}
+
+	return mkStream(c.Context(), s), nil
 }
 
 type stream struct {
 	c      context.Context
 	cancel func()
-	*yamux.Stream
+	s      *yamux.Stream
+}
+
+func mkStream(c context.Context, s *yamux.Stream) (strm stream) {
+	strm.c, strm.cancel = context.WithCancel(c)
+	strm.s = s
+	return
+}
+
+func (s stream) LocalAddr() net.Addr  { return s.s.LocalAddr() }
+func (s stream) RemoteAddr() net.Addr { return s.s.RemoteAddr() }
+
+func (s stream) Read(b []byte) (n int, err error) {
+	if n, err = s.s.Read(b); err != nil {
+		err = s.chkErr(err)
+	}
+	return
+}
+
+func (s stream) Write(b []byte) (n int, err error) {
+	if n, err = s.s.Write(b); err != nil {
+		err = s.chkErr(err)
+	}
+	return
+}
+
+func (s stream) SetDeadline(t time.Time) error {
+	if err := s.s.SetDeadline(t); err != nil {
+		return s.chkErr(err)
+	}
+	return nil
+}
+
+func (s stream) SetReadDeadline(t time.Time) error {
+	if err := s.s.SetReadDeadline(t); err != nil {
+		return s.chkErr(err)
+	}
+	return nil
+}
+
+func (s stream) SetWriteDeadline(t time.Time) error {
+	if err := s.s.SetWriteDeadline(t); err != nil {
+		return s.chkErr(err)
+	}
+	return nil
+}
+
+func (s stream) StreamID() uint32 { return s.s.StreamID() }
+
+func (s stream) chkErr(err error) error {
+	if e, ok := err.(net.Error); ok && e.Temporary() {
+		return err
+	}
+
+	s.cancel()
+	return err
 }
 
 func (s stream) Context() context.Context { return s.c }
 func (s stream) Close() error {
 	s.cancel()
-	return s.Stream.Close()
+	return s.s.Close()
 }
 
 // Transport for any pipe.Conn
