@@ -3,8 +3,6 @@ package inproc
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
-	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -89,8 +87,11 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 	<-time.After(time.Millisecond) // give the listener time to read
 }
 
-func integrationTest(c context.Context, t *testing.T, tp pipe.Transport, addr string) {
-	l, err := tp.Listen(c, Addr(addr))
+func TestItegration(t *testing.T) {
+	tp := New()
+	c := context.Background()
+
+	l, err := tp.Listen(c, Addr("/test"))
 	assert.NoError(t, err)
 	assert.NotNil(t, l)
 	defer func() { assert.NoError(t, l.Close()) }()
@@ -100,78 +101,4 @@ func integrationTest(c context.Context, t *testing.T, tp pipe.Transport, addr st
 	go listenTest(c, t, &wg, l)
 	go dialTest(c, t, &wg, tp)
 	wg.Wait()
-}
-func TestItegration(t *testing.T) {
-	integrationTest(context.Background(), t, New(), "/test")
-}
-
-func TestIntegrationParallel(t *testing.T) {
-	inproc := New()
-
-	t.Run("Parallel", func(t *testing.T) {
-		t.Parallel()
-		n := 1
-
-		l, err := inproc.Listen(context.Background(), Addr("/parallel/listen"))
-		assert.NoError(t, err)
-		assert.NotNil(t, l)
-
-		go t.Run("Server", func(t *testing.T) {
-			// defer func() { assert.NoError(t, l.Close()) }()
-
-			var wg sync.WaitGroup
-			wg.Add(n)
-
-			for i := 0; i < n; i++ {
-				conn, err := l.Accept()
-				assert.NoError(t, err)
-				// defer conn.Close()
-
-				t.Fatal(conn)
-
-				s, err := conn.AcceptStream()
-				assert.NoError(t, err)
-
-				go func() {
-					// defer s.Close()
-
-					var payload int8
-					assert.NoError(t, binary.Read(s, binary.BigEndian, &payload))
-					assert.NoError(t, binary.Write(s, binary.BigEndian, payload))
-				}()
-
-				wg.Wait()
-				<-time.After(time.Millisecond * 10) // TODO: try removing when working
-			}
-		})
-
-		// Clients
-		var wg sync.WaitGroup
-		wg.Add(n)
-
-		for i := 0; i < n; i++ {
-			name := fmt.Sprintf("client-%d", i)
-
-			func(i int8) {
-				go t.Run(name, func(t *testing.T) {
-					defer wg.Done()
-
-					conn, err := inproc.Dial(context.Background(), Addr("/parallel/listen"))
-					assert.NoError(t, err)
-					// defer conn.Close()
-
-					s, err := conn.OpenStream()
-					assert.NoError(t, err)
-					// defer s.Close()
-
-					var echo int8
-					assert.NoError(t, binary.Write(s, binary.BigEndian, i))
-					assert.NoError(t, binary.Read(s, binary.BigEndian, &echo))
-					assert.Equal(t, i, echo)
-				})
-			}(int8(i))
-		}
-
-		wg.Wait()
-	})
 }

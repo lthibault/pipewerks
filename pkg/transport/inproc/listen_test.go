@@ -68,7 +68,7 @@ func TestListener(t *testing.T) {
 				}
 			}()
 
-			assert.EqualError(t, l.connect(context.Background(), nil), "connection refused")
+			assert.Error(t, l.connect(context.Background(), nil))
 		})
 	})
 
