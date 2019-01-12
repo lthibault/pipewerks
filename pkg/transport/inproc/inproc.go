@@ -4,7 +4,7 @@ import (
 	"github.com/lthibault/pipewerks/pkg/transport/generic"
 )
 
-const netInproc = ""
+const netInproc = "inproc"
 
 // Addr for inproc transport
 type Addr string

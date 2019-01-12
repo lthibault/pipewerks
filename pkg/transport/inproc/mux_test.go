@@ -62,7 +62,7 @@ func TestMux(t *testing.T) {
 			m.m["/fail"] = &listener{}
 			defer delete(m.m, "/fail")
 
-			_, err := m.DialContext(c, "", "/fail")
+			_, err := m.DialContext(c, netInproc, "/fail")
 			assert.EqualError(t, err, context.Canceled.Error())
 		})
 	})
