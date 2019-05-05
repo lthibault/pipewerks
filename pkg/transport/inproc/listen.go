@@ -5,12 +5,14 @@ import (
 	"errors"
 	"net"
 	"sync"
+
+	pipe "github.com/lthibault/pipewerks/pkg"
 )
 
 type listener struct {
 	o       sync.Once
 	cq      chan struct{}
-	ch      chan net.Conn
+	ch      chan *conn
 	a       Addr
 	release func()
 }
@@ -18,7 +20,7 @@ type listener struct {
 func newListener(a Addr, gc func()) *listener {
 	return &listener{
 		a:       a,
-		ch:      make(chan net.Conn),
+		ch:      make(chan *conn),
 		cq:      make(chan struct{}),
 		release: gc,
 	}
@@ -39,11 +41,11 @@ func (l *listener) Close() (err error) {
 	return
 }
 
-func (l *listener) Accept() (net.Conn, error) {
+func (l *listener) Accept() (pipe.Conn, error) {
 	select {
 	case <-l.cq:
-	default:
-		if conn, ok := <-l.ch; ok {
+	case conn, ok := <-l.ch:
+		if ok {
 			return conn, nil
 		}
 	}
@@ -51,7 +53,7 @@ func (l *listener) Accept() (net.Conn, error) {
 	return nil, errors.New("closed")
 }
 
-func (l *listener) connect(c context.Context, conn net.Conn) (err error) {
+func (l *listener) connect(c context.Context, conn *conn) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("closed")
