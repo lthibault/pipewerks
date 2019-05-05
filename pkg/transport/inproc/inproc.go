@@ -23,22 +23,22 @@ func (a Addr) String() string { return string(a) }
 
 // Transport bytes around the process
 type Transport struct {
-	sync.RWMutex
-	m map[string]*listener
+	mu sync.RWMutex
+	m  map[string]*listener
 }
 
 func (t *Transport) gc(addr string) func() {
 	return func() {
-		t.Lock()
+		t.mu.Lock()
 		delete(t.m, addr)
-		t.Unlock()
+		t.mu.Unlock()
 	}
 }
 
 // Listen inproc
 func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
-	t.Lock()
-	defer t.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if a.Network() != "inproc" {
 		return nil, errors.Errorf("inproc: invalid network %s", a.Network())
@@ -52,8 +52,8 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error)
 
 // Dial inproc
 func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	t.RLock()
-	defer t.RUnlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
 	if a.Network() != "inproc" {
 		return nil, errors.Errorf("inproc: invalid network %s", a.Network())
