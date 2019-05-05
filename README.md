@@ -2,7 +2,6 @@
 
 [![Godoc Reference](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/lthibault/pipewerks/pkg) [![Go Report Card](https://goreportcard.com/badge/github.com/lthibault/pipewerks?style=flat-square)](https://goreportcard.com/report/github.com/lthibault/pipewerks)
 
-
 A simple library for working with reliable transports.
 
 ## Installation
