@@ -13,7 +13,7 @@ type Option func(*Transport) (prev Option)
 func OptListener(l *net.ListenConfig) Option {
 	return func(t *Transport) (prev Option) {
 		prev = OptListener(t.Transport.NetListener.(*net.ListenConfig))
-		t.Transport.NetListener = l
+		OptGeneric(generic.OptListener(l))(t)
 		return
 	}
 }
@@ -22,7 +22,7 @@ func OptListener(l *net.ListenConfig) Option {
 func OptDialer(d *net.Dialer) Option {
 	return func(t *Transport) (prev Option) {
 		prev = OptDialer(t.Transport.NetDialer.(*net.Dialer))
-		t.Transport.NetDialer = d
+		OptGeneric(generic.OptDialer(d))(t)
 		return
 	}
 }
