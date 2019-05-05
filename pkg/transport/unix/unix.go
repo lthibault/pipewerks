@@ -9,12 +9,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+func checkNetwork(a net.Addr) (ok bool) {
+	switch a.Network() {
+	case "unix", "unixgram", "unixpacket":
+		ok = true
+	}
+
+	return
+}
+
 // Transport over Unix domain socket
 type Transport struct{ generic.Transport }
 
 // Listen Unix
 func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
-	if a.Network() != "unix" {
+	if !checkNetwork(a) {
 		return nil, errors.Errorf("unix: invalid network %s", a.Network())
 	}
 
@@ -23,7 +32,7 @@ func (t Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) 
 
 // Dial Unix
 func (t Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	if a.Network() != "unix" {
+	if !checkNetwork(a) {
 		return nil, errors.Errorf("tcp: invalid network %s", a.Network())
 	}
 

@@ -42,6 +42,15 @@ type stream struct {
 
 func (s stream) StreamID() uint32 { return uint32(s.Stream.StreamID()) }
 
+func checkNetwork(a net.Addr) (ok bool) {
+	switch a.Network() {
+	case "udp", "udp4", "udp6":
+		ok = true
+	}
+
+	return
+}
+
 // Transport over QUIC
 type Transport struct {
 	q *Config
@@ -50,7 +59,7 @@ type Transport struct {
 
 // Dial the specified address
 func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
-	if a.Network() != "udp" {
+	if !checkNetwork(a) {
 		return nil, errors.Errorf("quic: invalid network %s", a.Network())
 	}
 
@@ -64,7 +73,7 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 
 // Listen on the specified address
 func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
-	if a.Network() != "udp" {
+	if !checkNetwork(a) {
 		return nil, errors.Errorf("quic: invalid network %s", a.Network())
 	}
 
