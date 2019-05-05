@@ -10,9 +10,8 @@ import (
 
 	"github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -101,4 +100,54 @@ func TestItegration(t *testing.T) {
 	go listenTest(c, t, &wg, l)
 	go dialTest(c, t, &wg, tp)
 	wg.Wait()
+}
+
+var res = make([]byte, 5)
+
+func BenchmarkTransmission(b *testing.B) {
+	t := New()
+
+	l, err := t.Listen(context.Background(), Addr("/bench"))
+	if err != nil {
+		b.Error(err)
+	}
+
+	go func() {
+
+		svrConn, err := l.Accept()
+		if err != nil {
+			b.Error(err)
+		}
+
+		svrStream, err := svrConn.AcceptStream()
+		if err != nil {
+			b.Error(err)
+		}
+
+		for {
+			if _, err := svrStream.Read(res); err != nil {
+				b.Error(err)
+			}
+		}
+	}()
+
+	cltConn, err := t.Dial(context.Background(), Addr("/bench"))
+	if err != nil {
+		b.Error(err)
+	}
+
+	cltStream, err := cltConn.OpenStream()
+	if err != nil {
+		b.Error(err)
+	}
+
+	snd := []byte("hello")
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if _, err := cltStream.Write(snd); err != nil {
+			b.Error(err)
+		}
+	}
 }
