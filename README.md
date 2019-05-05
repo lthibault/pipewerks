@@ -87,3 +87,16 @@ func main() {
     startClient(context.Background(), t, addr)
 }
 ```
+
+## Supported Transports
+
+The following wire protocols are implemented or planned.
+
+- [x] In-Process
+- [x] [TCP](https://en.wikipedia.org/wiki/Transmission_Control_Protocol)
+- [x] [Unix domain socket](https://en.wikipedia.org/wiki/Unix_domain_socket)
+- [x] [QUIC](https://en.wikipedia.org/wiki/QUIC)
+- [ ] [µTP](https://en.wikipedia.org/wiki/Micro_Transport_Protocol)
+- [ ] [KCP](https://github.com/xtaci/kcp-go)
+
+In addition, a `generic` transport is provided to facilitate the writing of new transport types.
