@@ -37,7 +37,7 @@ func TestListener(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			go func() { <-l.ch }()
-			assert.NoError(t, l.connect(context.Background(), nil))
+			assert.NoError(t, l.Connect(context.Background(), nil))
 		})
 
 		t.Run("DialContextExpired", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestListener(t *testing.T) {
 				}
 			}()
 
-			assert.EqualError(t, l.connect(c, nil), context.Canceled.Error())
+			assert.EqualError(t, l.Connect(c, nil), context.Canceled.Error())
 		})
 
 		t.Run("Closed", func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestListener(t *testing.T) {
 				}
 			}()
 
-			assert.Error(t, l.connect(context.Background(), nil))
+			assert.Error(t, l.Connect(context.Background(), nil))
 		})
 	})
 

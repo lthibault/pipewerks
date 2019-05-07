@@ -12,7 +12,7 @@ import (
 type listener struct {
 	o       sync.Once
 	cq      chan struct{}
-	ch      chan *conn
+	ch      chan pipe.Conn
 	a       Addr
 	release func()
 }
@@ -20,7 +20,7 @@ type listener struct {
 func newListener(a Addr, gc func()) *listener {
 	return &listener{
 		a:       a,
-		ch:      make(chan *conn),
+		ch:      make(chan pipe.Conn),
 		cq:      make(chan struct{}),
 		release: gc,
 	}
@@ -53,7 +53,7 @@ func (l *listener) Accept() (pipe.Conn, error) {
 	return nil, errors.New("closed")
 }
 
-func (l *listener) connect(c context.Context, conn *conn) (err error) {
+func (l *listener) Connect(c context.Context, conn pipe.Conn) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("closed")

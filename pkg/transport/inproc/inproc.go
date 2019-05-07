@@ -24,19 +24,19 @@ func (a Addr) String() string { return string(a) }
 // Transport bytes around the process
 type Transport struct {
 	mu sync.RWMutex
-	m  map[string]*listener
+	ns Namespace
 }
 
 func (t *Transport) gc(addr string) func() {
 	return func() {
 		t.mu.Lock()
-		delete(t.m, addr)
+		t.ns.Free(addr)
 		t.mu.Unlock()
 	}
 }
 
 // Listen inproc
-func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error) {
+func (t *Transport) Listen(_ context.Context, a net.Addr) (pipe.Listener, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -45,8 +45,10 @@ func (t *Transport) Listen(c context.Context, a net.Addr) (pipe.Listener, error)
 	}
 
 	l := newListener(Addr(a.String()), t.gc(a.String()))
+	if ok := t.ns.Bind(a.String(), l); !ok {
+		return nil, errors.Errorf("%s: address in use", a.String())
+	}
 
-	t.m[a.String()] = l
 	return l, nil
 }
 
@@ -66,12 +68,12 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 
 	local, remote := newConn(context.Background(), laddr, a)
 
-	l, ok := t.m[a.String()]
+	l, ok := t.ns.GetConnector(a.String())
 	if !ok {
 		return nil, errors.New("connection refused")
 	}
 
-	if err := l.connect(c, remote); err != nil {
+	if err := l.Connect(c, remote); err != nil {
 		return nil, err
 	}
 
@@ -79,4 +81,12 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 }
 
 // New in-process Transport
-func New() *Transport { return &Transport{m: make(map[string]*listener)} }
+func New(opt ...Option) *Transport {
+	t := &Transport{ns: DefaultNamespace}
+
+	for _, f := range opt {
+		f(t)
+	}
+
+	return t
+}
