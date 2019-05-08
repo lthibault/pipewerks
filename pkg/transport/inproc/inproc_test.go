@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lthibault/pipewerks/pkg"
+	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
@@ -105,7 +105,7 @@ func TestItegration(t *testing.T) {
 var res = make([]byte, 5)
 
 func BenchmarkTransmission(b *testing.B) {
-	t := New()
+	t := New(OptNamespace(make(namespace)))
 
 	l, err := t.Listen(context.Background(), Addr("/bench"))
 	if err != nil {
