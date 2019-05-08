@@ -3,11 +3,7 @@ package inproc
 import (
 	"context"
 	"net"
-
-	pipe "github.com/lthibault/pipewerks/pkg"
 )
-
-var _ pipe.Stream = &stream{}
 
 type stream struct {
 	ctx    context.Context
