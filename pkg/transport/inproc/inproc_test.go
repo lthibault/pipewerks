@@ -87,7 +87,7 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 }
 
 func TestItegration(t *testing.T) {
-	tp := New()
+	tp := New(OptNamespace(make(namespace)))
 	c := context.Background()
 
 	l, err := tp.Listen(c, Addr("/test"))
