@@ -19,8 +19,6 @@ type stream struct {
 
 func (s stream) Context() context.Context { return s.ctx }
 func (s stream) StreamID() uint32         { return s.id }
-func (s stream) LocalAddr() net.Addr      { return Addr(s.Conn.LocalAddr().String()) }
-func (s stream) RemoteAddr() net.Addr     { return Addr(s.Conn.RemoteAddr().String()) }
 
 func (s stream) Close() error {
 	s.cancel()
