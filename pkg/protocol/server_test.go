@@ -64,11 +64,11 @@ func TestServer(t *testing.T) {
 	})
 }
 
-var ctr synctoolz.Ctr
+var c synctoolz.Ctr
 
 func BenchmarkOpenStream(b *testing.B) {
 	s := Server{
-		Handler: HandlerFunc(func(s pipe.Stream) { ctr.Decr() }),
+		Handler: HandlerFunc(func(s pipe.Stream) { c.Decr() }),
 	}
 
 	addr := inproc.Addr("/benchmark")
@@ -91,11 +91,11 @@ func BenchmarkOpenStream(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		ctr.Incr()
+		c.Incr()
 		conn.OpenStream()
 	}
 
-	for ctr.Num() != 0 {
+	for c.Num() != 0 {
 	} // spin
 
 	b.StopTimer()

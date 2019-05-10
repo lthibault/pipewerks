@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	synctoolz "github.com/lthibault/toolz/pkg/sync"
+
 	"github.com/jpillora/backoff"
 	log "github.com/lthibault/log/pkg"
 	pipe "github.com/lthibault/pipewerks/pkg"
@@ -41,7 +43,7 @@ type Server struct {
 	mu   sync.Mutex
 	cq   chan struct{}
 	ls   *listenerSet
-	ss   *streamSet
+	cs   *connSet
 
 	ConnStateHandler   func(pipe.Conn, ConnState)
 	StreamStateHandler func(pipe.Stream, StreamState)
@@ -52,9 +54,15 @@ func (s *Server) Serve(l pipe.Listener) error {
 	s.init.Do(func() {
 		s.cq = make(chan struct{})
 		s.ls = &listenerSet{ls: make(map[*pipe.Listener]struct{}), mu: &s.mu}
-		s.ss = newStreamSet()
+		s.cs = newConnSet()
 		if s.Logger == nil {
 			s.Logger = log.New(log.OptLevel(log.NullLevel))
+		}
+		if s.ConnStateHandler == nil {
+			s.ConnStateHandler = func(pipe.Conn, ConnState) {}
+		}
+		if s.StreamStateHandler == nil {
+			s.StreamStateHandler = func(pipe.Stream, StreamState) {}
 		}
 	})
 
@@ -91,6 +99,7 @@ func (s *Server) Serve(l pipe.Listener) error {
 }
 
 func (s *Server) serveConn(conn pipe.Conn) {
+	ref := s.cs.Add(conn)
 	s.ConnStateHandler(conn, ConnStateOpen)
 	defer s.ConnStateHandler(conn, ConnStateClosed)
 
@@ -110,15 +119,14 @@ func (s *Server) serveConn(conn pipe.Conn) {
 			return
 		}
 
-		go s.serveStream(stream)
+		go s.serveStream(stream, ref.Decr) // ref == 1; no need to increment here.
 	}
 }
 
-func (s *Server) serveStream(stream pipe.Stream) {
-	s.ss.Add(stream)
+func (s *Server) serveStream(stream pipe.Stream, done func()) {
 	s.StreamStateHandler(stream, StreamStateOpen)
 	defer s.StreamStateHandler(stream, StreamStateClosed)
-	defer s.ss.Del(stream)
+	defer done()
 
 	s.ServeStream(stream)
 }
@@ -131,7 +139,7 @@ func (s *Server) Close() error {
 		return ErrServerClosed
 	default:
 		close(s.cq)
-		return s.ss.CloseAll()
+		return s.cs.CloseAll()
 	}
 }
 
@@ -148,7 +156,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-ticker.C:
-				if s.ss.quiescent() {
+				if s.cs.quiescent() {
 					return nil
 				}
 			}
@@ -206,39 +214,68 @@ func (s *listenerSet) CloseAll() error {
 	return g.Wait()
 }
 
-type streamSet struct {
+type refCounter interface {
+	Incr() refCounter
+	Decr()
+}
+
+type ctr struct {
+	synctoolz.Ctr
+	cleanup func()
+}
+
+func (c *ctr) Incr() refCounter {
+	c.Ctr.Incr()
+	return c
+}
+
+func (c *ctr) Decr() {
+	if c.Ctr.Decr() == 0 {
+		c.cleanup()
+	}
+}
+
+type connSet struct {
 	mu sync.Mutex
-	ss map[io.Closer]struct{}
+	cs map[io.Closer]*ctr
 }
 
-func newStreamSet() *streamSet {
-	return &streamSet{ss: make(map[io.Closer]struct{})}
+func newConnSet() *connSet {
+	return &connSet{cs: make(map[io.Closer]*ctr)}
 }
 
-func (set *streamSet) quiescent() bool {
+func (set *connSet) quiescent() bool {
 	set.mu.Lock()
 	defer set.mu.Unlock()
-	return len(set.ss) == 0
+	return len(set.cs) == 0
 }
 
-func (set *streamSet) Add(s pipe.Stream) {
+func (set *connSet) Add(conn pipe.Conn) refCounter {
+	c := &ctr{cleanup: set.gc(conn)}
+
 	set.mu.Lock()
-	set.ss[s] = struct{}{}
+	set.cs[conn] = c
 	set.mu.Unlock()
+
+	return c.Incr()
 }
 
-func (set *streamSet) Del(s pipe.Stream) {
-	set.mu.Lock()
-	delete(set.ss, s)
-	set.mu.Unlock()
+func (set *connSet) gc(conn pipe.Conn) func() {
+	return func() {
+		conn.Close()
+		defer set.mu.Unlock()
+
+		set.mu.Lock()
+		delete(set.cs, conn)
+	}
 }
 
-func (set *streamSet) CloseAll() error {
+func (set *connSet) CloseAll() error {
 	set.mu.Lock()
 	defer set.mu.Unlock()
 
 	var g errgroup.Group
-	for s := range set.ss {
+	for s := range set.cs {
 		g.Go(s.Close)
 	}
 	return g.Wait()
