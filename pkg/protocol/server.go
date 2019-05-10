@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SentimensRG/ctx"
 	synctoolz "github.com/lthibault/toolz/pkg/sync"
 
 	"github.com/jpillora/backoff"
@@ -51,6 +52,8 @@ type Server struct {
 
 // Serve streams.  Serve always returns a non-nil error and closes l.
 func (s *Server) Serve(l pipe.Listener) error {
+	// Start by doing some initialization.  A Server can listen on multiple interfaces
+	// at once, so setup needs to be idempotent.
 	s.init.Do(func() {
 		s.cq = make(chan struct{})
 		s.ls = &listenerSet{ls: make(map[*pipe.Listener]struct{}), mu: &s.mu}
@@ -66,7 +69,10 @@ func (s *Server) Serve(l pipe.Listener) error {
 		}
 	})
 
-	l = &closeOnceListener{Listener: l}
+	// There are two paths to closing a listener.  The first is by breaking out of the
+	// main server loop below.  The second is via a call to Close()/Shutdown(), which
+	// calls listenerSet.CloseAll().
+	l = &closeOnceListener{Listener: l} // makes l.Close idempotent
 	defer l.Close()
 
 	if !s.ls.Add(&l) {
@@ -74,6 +80,8 @@ func (s *Server) Serve(l pipe.Listener) error {
 	}
 	defer s.ls.Del(&l)
 
+	// Start the main server loop.  This accepts connections in until (a) the server is
+	// closed (b) a non-temporary network outage occurs.
 	for {
 		conn, e := l.Accept()
 		if e != nil {
@@ -99,12 +107,26 @@ func (s *Server) Serve(l pipe.Listener) error {
 }
 
 func (s *Server) serveConn(conn pipe.Conn) {
-	ref := s.cs.Add(conn)
 	s.ConnStateHandler(conn, ConnStateOpen)
 	defer s.ConnStateHandler(conn, ConnStateClosed)
 
+	// Start by getting a reference counter for the stream.  Initially, the counter is
+	// set to zero.  When it reaches zero again, the stream will be closed.
+	ref := s.cs.Add(conn)
+
+	// Accept the control stream.  This stream holds a refcount but does nothing.  This
+	// ensures the Conn is not closed until the client explicitly signals a "discard" by
+	// closing the control stream.
+	if err := s.startControl(conn, ref.Incr()); err != nil {
+		s.Logger.WithError(err).Error("failed to accept control stream")
+	}
+
+	// Configure exponential backoff in case we hit temporary netowrk outages.
+	// TODO:  make this configurable (?)
 	b := backoff.Backoff{Max: time.Minute, Jitter: true}
 
+	// Start the conn loop.  This repeatedly accepts streams from the connection until a
+	// non-temporary error is reached.
 	for {
 		stream, err := conn.AcceptStream()
 		if err != nil {
@@ -112,14 +134,16 @@ func (s *Server) serveConn(conn pipe.Conn) {
 				s.Logger.WithError(err).
 					WithField("addr", conn.RemoteAddr()).
 					WithField("retry", b.ForAttempt(b.Attempt())).
-					Debug("failed to accept stream")
+					Debug("temporary network outage")
 				time.Sleep(b.Duration())
 				continue
 			}
+
+			s.Logger.WithError(err).Debug("connection closed")
 			return
 		}
 
-		go s.serveStream(stream, ref.Decr) // ref == 1; no need to increment here.
+		go s.serveStream(stream, ref.Incr().Decr)
 	}
 }
 
@@ -129,6 +153,18 @@ func (s *Server) serveStream(stream pipe.Stream, done func()) {
 	defer done()
 
 	s.ServeStream(stream)
+}
+
+func (s *Server) startControl(conn pipe.Conn, ref refCounter) (err error) {
+	var ctrl pipe.Stream
+
+	if ctrl, err = conn.AcceptStream(); err != nil {
+		ref.Decr()
+	} else {
+		ctx.Defer(ctrl.Context(), ref.Decr)
+	}
+
+	return
 }
 
 // Close immediately, terminating all active pipe.Listeners and any connections.
@@ -144,7 +180,7 @@ func (s *Server) Close() error {
 }
 
 // Shutdown gracefully shuts down the server without interrupting any active connections.
-func (s *Server) Shutdown(ctx context.Context) error {
+func (s *Server) Shutdown(c context.Context) error {
 	var g errgroup.Group
 	g.Go(s.ls.CloseAll)
 	g.Go(func() error {
@@ -153,8 +189,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 		for {
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-c.Done():
+				return c.Err()
 			case <-ticker.C:
 				if s.cs.quiescent() {
 					return nil
@@ -257,7 +293,7 @@ func (set *connSet) Add(conn pipe.Conn) refCounter {
 	set.cs[conn] = c
 	set.mu.Unlock()
 
-	return c.Incr()
+	return c
 }
 
 func (set *connSet) gc(conn pipe.Conn) func() {
