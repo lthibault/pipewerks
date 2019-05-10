@@ -41,7 +41,10 @@ type Server struct {
 	mu   sync.Mutex
 	cq   chan struct{}
 	ls   *listenerSet
-	cs   connSet
+	ss   *streamSet
+
+	ConnStateHandler   func(pipe.Conn, ConnState)
+	StreamStateHandler func(pipe.Stream, StreamState)
 }
 
 // Serve streams.  Serve always returns a non-nil error and closes l.
@@ -49,7 +52,7 @@ func (s *Server) Serve(l pipe.Listener) error {
 	s.init.Do(func() {
 		s.cq = make(chan struct{})
 		s.ls = &listenerSet{ls: make(map[*pipe.Listener]struct{}), mu: &s.mu}
-		s.cs.cs = make(map[io.Closer]struct{})
+		s.ss = newStreamSet()
 		if s.Logger == nil {
 			s.Logger = log.New(log.OptLevel(log.NullLevel))
 		}
@@ -88,6 +91,9 @@ func (s *Server) Serve(l pipe.Listener) error {
 }
 
 func (s *Server) serveConn(conn pipe.Conn) {
+	s.ConnStateHandler(conn, ConnStateOpen)
+	defer s.ConnStateHandler(conn, ConnStateClosed)
+
 	b := backoff.Backoff{Max: time.Minute, Jitter: true}
 
 	for {
@@ -109,8 +115,11 @@ func (s *Server) serveConn(conn pipe.Conn) {
 }
 
 func (s *Server) serveStream(stream pipe.Stream) {
-	s.cs.Add(stream)
-	defer s.cs.Del(stream)
+	s.ss.Add(stream)
+	s.StreamStateHandler(stream, StreamStateOpen)
+	defer s.StreamStateHandler(stream, StreamStateClosed)
+	defer s.ss.Del(stream)
+
 	s.ServeStream(stream)
 }
 
@@ -122,7 +131,7 @@ func (s *Server) Close() error {
 		return ErrServerClosed
 	default:
 		close(s.cq)
-		return s.cs.CloseAll()
+		return s.ss.CloseAll()
 	}
 }
 
@@ -139,7 +148,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-ticker.C:
-				if s.cs.quiescent() {
+				if s.ss.quiescent() {
 					return nil
 				}
 			}
@@ -197,36 +206,40 @@ func (s *listenerSet) CloseAll() error {
 	return g.Wait()
 }
 
-type connSet struct {
+type streamSet struct {
 	mu sync.Mutex
-	cs map[io.Closer]struct{}
+	ss map[io.Closer]struct{}
 }
 
-func (c *connSet) quiescent() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.cs) == 0
+func newStreamSet() *streamSet {
+	return &streamSet{ss: make(map[io.Closer]struct{})}
 }
 
-func (c *connSet) Add(cl io.Closer) {
-	c.mu.Lock()
-	c.cs[cl] = struct{}{}
-	c.mu.Unlock()
+func (set *streamSet) quiescent() bool {
+	set.mu.Lock()
+	defer set.mu.Unlock()
+	return len(set.ss) == 0
 }
 
-func (c *connSet) Del(cl io.Closer) {
-	c.mu.Lock()
-	delete(c.cs, cl)
-	c.mu.Unlock()
+func (set *streamSet) Add(s pipe.Stream) {
+	set.mu.Lock()
+	set.ss[s] = struct{}{}
+	set.mu.Unlock()
 }
 
-func (c *connSet) CloseAll() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (set *streamSet) Del(s pipe.Stream) {
+	set.mu.Lock()
+	delete(set.ss, s)
+	set.mu.Unlock()
+}
+
+func (set *streamSet) CloseAll() error {
+	set.mu.Lock()
+	defer set.mu.Unlock()
 
 	var g errgroup.Group
-	for conn := range c.cs {
-		g.Go(conn.Close)
+	for s := range set.ss {
+		g.Go(s.Close)
 	}
 	return g.Wait()
 }
