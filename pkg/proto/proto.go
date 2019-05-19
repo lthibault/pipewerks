@@ -17,9 +17,9 @@ type ConnState uint8
 func (c ConnState) String() string {
 	switch c {
 	case ConnStateOpen:
-		return "open"
+		return "connection open"
 	case ConnStateClosed:
-		return "closed"
+		return "connection closed"
 	}
 
 	panic("unreachable")
@@ -31,11 +31,11 @@ type StreamState uint8
 func (s StreamState) String() string {
 	switch s {
 	case StreamStateOpen:
-		return "open"
+		return "stream open"
 	case StreamStateIdle:
-		return "idle"
+		return "stream idle"
 	case StreamStateClosed:
-		return "closed"
+		return "stream closed"
 	}
 
 	panic("unreachable")
