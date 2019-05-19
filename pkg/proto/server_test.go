@@ -1,12 +1,10 @@
-package protocol
+package proto
 
 import (
 	"bytes"
 	"context"
 	"io"
 	"testing"
-
-	synctoolz "github.com/lthibault/toolz/pkg/sync"
 
 	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/inproc"
@@ -62,41 +60,4 @@ func TestServer(t *testing.T) {
 	t.Run("Close", func(t *testing.T) {
 		assert.NoError(t, s.Close())
 	})
-}
-
-var c synctoolz.Ctr
-
-func BenchmarkOpenStream(b *testing.B) {
-	s := Server{
-		Handler: HandlerFunc(func(s pipe.Stream) { c.Decr() }),
-	}
-
-	addr := inproc.Addr("/benchmark")
-	l, err := d.Listen(context.Background(), addr)
-	if !assert.NoError(b, err) {
-		b.FailNow()
-	}
-	defer l.Close()
-
-	go s.Serve(l)
-
-	ctx := context.Background()
-
-	conn, err := d.Dial(ctx, addr)
-	if !assert.NoError(b, err) {
-		b.FailNow()
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		c.Incr()
-		conn.OpenStream()
-	}
-
-	for c.Num() != 0 {
-	} // spin
-
-	b.StopTimer()
 }

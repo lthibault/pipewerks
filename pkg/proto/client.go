@@ -1,4 +1,4 @@
-package protocol
+package proto
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 // DefaultStrategy is a global dial strategy that allows dialers to share a global
 // connection & stream pool.
-var DefaultStrategy DialStrategy = &defaultStrategy{cs: make(map[string]*ctrConn)}
+var DefaultStrategy DialStrategy = &closeIdleStrategy{cs: make(map[string]*ctrConn)}
 
 // PipeDialer is the client end of a Pipewerks Transport.
 type PipeDialer interface {
@@ -55,12 +55,12 @@ func (c *Client) Connect(ctx context.Context, a net.Addr) (pipe.Stream, error) {
 	return conn.OpenStream()
 }
 
-type defaultStrategy struct {
+type closeIdleStrategy struct {
 	mu sync.Mutex
 	cs map[string]*ctrConn
 }
 
-func (ds *defaultStrategy) gc(addr string) func() {
+func (ds *closeIdleStrategy) gc(addr string) func() {
 	return func() {
 		ds.mu.Lock()
 		delete(ds.cs, addr)
@@ -68,7 +68,7 @@ func (ds *defaultStrategy) gc(addr string) func() {
 	}
 }
 
-func (ds *defaultStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (pipe.Conn, error) {
+func (ds *closeIdleStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (pipe.Conn, error) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
@@ -82,22 +82,16 @@ func (ds *defaultStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) 
 		return nil, err
 	}
 
-	rconn := newCtrConn(conn)
-	ds.cs[a.String()] = rconn
-
+	ds.cs[a.String()] = &ctrConn{Conn: conn}
 	ctx.Defer(conn.Context(), ds.gc(a.String()))
 
-	return rconn, nil
+	return ds.cs[a.String()], nil
 }
 
 type ctrConn struct {
 	mu sync.RWMutex
 	synctoolz.Ctr
 	pipe.Conn
-}
-
-func newCtrConn(conn pipe.Conn) *ctrConn {
-	panic("function NOT IMPLEMENTED")
 }
 
 func (c *ctrConn) gc() {
@@ -116,7 +110,7 @@ func (c *ctrConn) AcceptStream() (s pipe.Stream, err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if s, err = c.AcceptStream(); err == nil {
+	if s, err = c.Conn.AcceptStream(); err == nil {
 		c.Ctr.Incr()
 		s = c.wrapStream(s)
 	}
@@ -128,7 +122,7 @@ func (c *ctrConn) OpenStream() (s pipe.Stream, err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if s, err = c.OpenStream(); err == nil {
+	if s, err = c.Conn.OpenStream(); err == nil {
 		c.Ctr.Incr()
 		s = c.wrapStream(s)
 	}

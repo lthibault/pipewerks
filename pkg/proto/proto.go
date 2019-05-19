@@ -1,4 +1,4 @@
-package protocol
+package proto
 
 import pipe "github.com/lthibault/pipewerks/pkg"
 
