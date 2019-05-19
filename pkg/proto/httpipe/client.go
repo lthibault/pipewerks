@@ -9,7 +9,7 @@ import (
 	"time"
 
 	pipe "github.com/lthibault/pipewerks/pkg"
-	"github.com/lthibault/pipewerks/pkg/protocol"
+	"github.com/lthibault/pipewerks/pkg/proto"
 )
 
 type address struct{ network, addr string }
@@ -50,11 +50,11 @@ func (s *refStream) Close() (err error) {
 
 type dialer struct {
 	sync.Mutex
-	protocol.PipeDialer
+	proto.PipeDialer
 	store map[address]*refConn
 }
 
-func newDialContext(d protocol.PipeDialer) func(context.Context, string, string) (net.Conn, error) {
+func newDialContext(d proto.PipeDialer) func(context.Context, string, string) (net.Conn, error) {
 	return (&dialer{
 		PipeDialer: d,
 		store:      make(map[address]*refConn),
@@ -96,7 +96,7 @@ func (d *dialer) getConn(ctx context.Context, a address) (pipe.Conn, error) {
 }
 
 // NewTransport produces an HTTP Transport that uses the specified Pipewerks Transport.
-func NewTransport(d protocol.PipeDialer) *http.Transport {
+func NewTransport(d proto.PipeDialer) *http.Transport {
 	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           newDialContext(d),
