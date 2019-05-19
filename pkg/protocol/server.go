@@ -114,12 +114,8 @@ func (s *Server) serveConn(conn pipe.Conn) {
 	// set to zero.  When it reaches zero again, the stream will be closed.
 	ref := s.cs.Add(conn)
 
-	// Accept the control stream.  This stream holds a refcount but does nothing.  This
-	// ensures the Conn is not closed until the client explicitly signals a "discard" by
-	// closing the control stream.
-	if err := s.startControl(conn, ref.Incr()); err != nil {
-		s.Logger.WithError(err).Error("failed to accept control stream")
-	}
+	// Ensure the Conn is not closed until the client explicitly closed by the client
+	ctx.Defer(conn.Context(), func() { ref.Incr().Decr() })
 
 	// Configure exponential backoff in case we hit temporary netowrk outages.
 	// TODO:  make this configurable (?)
@@ -147,24 +143,20 @@ func (s *Server) serveConn(conn pipe.Conn) {
 	}
 }
 
-func (s *Server) serveStream(stream pipe.Stream, done func()) {
+func (s *Server) serveStream(stream pipe.Stream, done func() uint32) {
 	s.StreamStateHandler(stream, StreamStateOpen)
-	defer s.StreamStateHandler(stream, StreamStateClosed)
-	defer done()
+	defer func() {
+		select {
+		case <-stream.Context().Done():
+			s.StreamStateHandler(stream, StreamStateClosed)
+		default:
+			if done() == 1 { // last ref is the Conn, else we'd be disconnected.
+				s.StreamStateHandler(stream, StreamStateIdle)
+			}
+		}
+	}()
 
 	s.ServeStream(stream)
-}
-
-func (s *Server) startControl(conn pipe.Conn, ref refCounter) (err error) {
-	var ctrl pipe.Stream
-
-	if ctrl, err = conn.AcceptStream(); err != nil {
-		ref.Decr()
-	} else {
-		ctx.Defer(ctrl.Context(), ref.Decr)
-	}
-
-	return
 }
 
 // Close immediately, terminating all active pipe.Listeners and any connections.
@@ -252,7 +244,7 @@ func (s *listenerSet) CloseAll() error {
 
 type refCounter interface {
 	Incr() refCounter
-	Decr()
+	Decr() uint32
 }
 
 type ctr struct {
@@ -265,10 +257,11 @@ func (c *ctr) Incr() refCounter {
 	return c
 }
 
-func (c *ctr) Decr() {
-	if c.Ctr.Decr() == 0 {
+func (c *ctr) Decr() (u uint32) {
+	if u = c.Ctr.Decr(); u == 0 {
 		c.cleanup()
 	}
+	return
 }
 
 type connSet struct {

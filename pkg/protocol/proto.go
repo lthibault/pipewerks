@@ -3,11 +3,11 @@ package protocol
 import pipe "github.com/lthibault/pipewerks/pkg"
 
 const (
-	ConnStateOpen = iota
+	ConnStateOpen ConnState = iota
 	ConnStateClosed
-	ConnStateIdle
 
-	StreamStateOpen = iota
+	StreamStateOpen StreamState = iota
+	StreamStateIdle
 	StreamStateClosed
 )
 
@@ -18,8 +18,6 @@ func (c ConnState) String() string {
 	switch c {
 	case ConnStateOpen:
 		return "open"
-	case ConnStateIdle:
-		return "idle"
 	case ConnStateClosed:
 		return "closed"
 	}
@@ -34,6 +32,8 @@ func (s StreamState) String() string {
 	switch s {
 	case StreamStateOpen:
 		return "open"
+	case StreamStateIdle:
+		return "idle"
 	case StreamStateClosed:
 		return "closed"
 	}
