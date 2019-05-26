@@ -1,7 +1,5 @@
 package proto
 
-import pipe "github.com/lthibault/pipewerks/pkg"
-
 const (
 	ConnStateOpen ConnState = iota
 	ConnStateClosed
@@ -39,14 +37,4 @@ func (s StreamState) String() string {
 	}
 
 	panic("unreachable")
-}
-
-type streamPool interface {
-	CloseAll() error
-	Get(pipe.Conn) (pipe.Stream, bool)
-	Put(pipe.Stream)
-}
-
-func newStreamPool(cap int) streamPool {
-	panic("function NOT IMPLEMENTED")
 }
