@@ -24,7 +24,7 @@ type PipeDialer interface {
 // DialStrategy is responsible dialing connections and opening streams.  This is where
 // connection/stream reuse is to be implemented.
 type DialStrategy interface {
-	GetConn(context.Context, PipeDialer, net.Addr) (c pipe.Conn, new bool, err error)
+	GetConn(context.Context, PipeDialer, net.Addr) (c pipe.Conn, cached bool, err error)
 }
 
 // A Client connects to a server
@@ -72,24 +72,24 @@ func (ds *StreamCountStrategy) gc(addr string) func() {
 
 // GetConn returns an existing conn if one exists for the given address, else dials a
 // new connection.
-func (ds *StreamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (pipe.Conn, bool, error) {
+func (ds *StreamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (conn pipe.Conn, cached bool, err error) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
-	if conn, ok := ds.cs[a.String()]; ok {
-		return conn, false, nil
+	if conn, cached = ds.cs[a.String()]; cached {
+		return
 	}
 
 	// slow path
-	conn, err := d.Dial(c, a)
-	if err != nil {
-		return nil, false, err
+	if conn, err = d.Dial(c, a); err != nil {
+		return
 	}
 
 	ds.cs[a.String()] = &ctrConn{Conn: conn}
+	conn = ds.cs[a.String()] // conn is a pipe.Conn, but ds.cs maps to a *ctrConn
 	ctx.Defer(conn.Context(), ds.gc(a.String()))
 
-	return ds.cs[a.String()], true, nil
+	return
 }
 
 type ctrConn struct {
