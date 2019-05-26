@@ -67,12 +67,12 @@ func TestCtrConn(t *testing.T) {
 	})
 }
 
-func TestCloseIdleStrategy(t *testing.T) {
+func TestStreamCountStrategy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	d := inproc.New()
-	s := closeIdleStrategy{cs: make(map[string]*ctrConn)}
+	s := StreamCountStrategy{cs: make(map[string]*ctrConn)}
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
@@ -93,18 +93,21 @@ func TestCloseIdleStrategy(t *testing.T) {
 	var conn pipe.Conn
 	t.Run("GetFresh", func(t *testing.T) {
 		var err error
-		conn, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		var isNew bool
+		conn, isNew, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
+		assert.True(t, isNew)
 	})
 
 	t.Run("GetCached", func(t *testing.T) {
-		cached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		cached, isNew, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
 
+		assert.False(t, isNew)
 		assert.Equal(t, conn, cached)
 	})
 
