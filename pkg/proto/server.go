@@ -62,10 +62,10 @@ func (s *Server) Serve(l pipe.Listener) error {
 			s.Logger = log.New(log.OptLevel(log.NullLevel))
 		}
 		if s.ConnStateHandler == nil {
-			s.ConnStateHandler = ConnStateHandlerFunc(func(pipe.Conn, ConnState) {})
+			s.ConnStateHandler = ConnStateHandlerFunc(func(*pipe.Conn, ConnState) {})
 		}
 		if s.StreamStateHandler == nil {
-			s.StreamStateHandler = StreamStateHandlerFunc(func(pipe.Stream, StreamState) {})
+			s.StreamStateHandler = StreamStateHandlerFunc(func(*pipe.Stream, StreamState) {})
 		}
 	})
 
@@ -107,8 +107,8 @@ func (s *Server) Serve(l pipe.Listener) error {
 }
 
 func (s *Server) serveConn(conn pipe.Conn) {
-	s.OnConnState(conn, ConnStateOpen)
-	defer s.OnConnState(conn, ConnStateClosed)
+	s.OnConnState(&conn, ConnStateOpen)
+	defer s.OnConnState(&conn, ConnStateClosed)
 
 	// Start by getting a reference counter for the stream.  Initially, the counter is
 	// set to zero.  When it reaches zero again, the stream will be closed.
@@ -144,14 +144,14 @@ func (s *Server) serveConn(conn pipe.Conn) {
 }
 
 func (s *Server) serveStream(stream pipe.Stream, done func() uint32) {
-	s.OnStreamState(stream, StreamStateOpen)
+	s.OnStreamState(&stream, StreamStateOpen)
 	defer func() {
 		select {
 		case <-stream.Context().Done():
-			s.OnStreamState(stream, StreamStateClosed)
+			s.OnStreamState(&stream, StreamStateClosed)
 		default:
 			if done() == 1 { // last ref is the Conn, else we'd be disconnected.
-				s.OnStreamState(stream, StreamStateIdle)
+				s.OnStreamState(&stream, StreamStateIdle)
 			}
 		}
 	}()
