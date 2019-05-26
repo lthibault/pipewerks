@@ -8,7 +8,6 @@ import (
 	"github.com/SentimensRG/ctx"
 	synctoolz "github.com/lthibault/toolz/pkg/sync"
 
-	log "github.com/lthibault/log/pkg"
 	pipe "github.com/lthibault/pipewerks/pkg"
 )
 
@@ -31,15 +30,13 @@ type DialStrategy interface {
 type Client struct {
 	Dialer   PipeDialer
 	Strategy DialStrategy
-	Logger   log.Logger
 
 	o sync.Once
 }
 
 func (c *Client) init() {
-	if c.Logger == nil {
+	if c.Strategy == nil {
 		c.Strategy = DefaultStrategy
-		c.Logger = log.New(log.OptLevel(log.NullLevel))
 	}
 }
 
