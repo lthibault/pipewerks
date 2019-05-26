@@ -13,7 +13,7 @@ import (
 
 // DefaultStrategy is a global dial strategy that allows dialers to share a global
 // connection & stream pool.
-var DefaultStrategy DialStrategy = &StreamCountStrategy{cs: make(map[string]*ctrConn)}
+var DefaultStrategy DialStrategy = &streamCountStrategy{cs: make(map[string]*ctrConn)}
 
 // PipeDialer is the client end of a Pipewerks Transport.
 type PipeDialer interface {
@@ -52,14 +52,14 @@ func (c *Client) Connect(ctx context.Context, a net.Addr) (pipe.Stream, error) {
 	return conn.OpenStream()
 }
 
-// StreamCountStrategy automatically closes connections when the strea count reaches
+// streamCountStrategy automatically closes connections when the strea count reaches
 // zero.
-type StreamCountStrategy struct {
+type streamCountStrategy struct {
 	mu sync.Mutex
 	cs map[string]*ctrConn
 }
 
-func (ds *StreamCountStrategy) gc(addr string) func() {
+func (ds *streamCountStrategy) gc(addr string) func() {
 	return func() {
 		ds.mu.Lock()
 		delete(ds.cs, addr)
@@ -69,7 +69,7 @@ func (ds *StreamCountStrategy) gc(addr string) func() {
 
 // GetConn returns an existing conn if one exists for the given address, else dials a
 // new connection.
-func (ds *StreamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (conn pipe.Conn, cached bool, err error) {
+func (ds *streamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (conn pipe.Conn, cached bool, err error) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
