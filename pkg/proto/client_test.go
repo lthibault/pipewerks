@@ -72,7 +72,7 @@ func TestStreamCountStrategy(t *testing.T) {
 	defer cancel()
 
 	d := inproc.New()
-	s := StreamCountStrategy{cs: make(map[string]*ctrConn)}
+	s := streamCountStrategy{cs: make(map[string]*ctrConn)}
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
@@ -93,22 +93,22 @@ func TestStreamCountStrategy(t *testing.T) {
 	var conn pipe.Conn
 	t.Run("GetFresh", func(t *testing.T) {
 		var err error
-		var isNew bool
-		conn, isNew, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		var cached bool
+		conn, cached, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
-		assert.True(t, isNew)
+		assert.False(t, cached)
 	})
 
 	t.Run("GetCached", func(t *testing.T) {
-		cached, isNew, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		cconn, cached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
 
-		assert.False(t, isNew)
-		assert.Equal(t, conn, cached)
+		assert.True(t, cached)
+		assert.Equal(t, conn, cconn)
 	})
 
 	t.Run("EvictIdle", func(t *testing.T) {
