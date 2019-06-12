@@ -12,7 +12,7 @@ import (
 
 // DefaultStrategy is a global dial strategy that allows dialers to share a global
 // connection & stream pool.
-var DefaultStrategy DialStrategy = &StreamCountStrategy{cs: make(map[string]*synctoolz.Var)}
+var DefaultStrategy DialStrategy = NewStreamCountStrategy()
 
 // PipeDialer is the client end of a Pipewerks Transport.
 type PipeDialer interface {
@@ -56,6 +56,11 @@ func (c *Client) Connect(ctx context.Context, a net.Addr) (pipe.Stream, error) {
 type StreamCountStrategy struct {
 	mu sync.Mutex
 	cs map[string]*synctoolz.Var
+}
+
+// NewStreamCountStrategy ...
+func NewStreamCountStrategy() *StreamCountStrategy {
+	return &StreamCountStrategy{cs: make(map[string]*synctoolz.Var)}
 }
 
 func (ds *StreamCountStrategy) gc(addr string) func() {
