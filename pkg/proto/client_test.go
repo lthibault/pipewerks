@@ -8,6 +8,7 @@ import (
 
 	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/inproc"
+	synctoolz "github.com/lthibault/toolz/pkg/sync"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,7 +73,7 @@ func TestStreamCountStrategy(t *testing.T) {
 	defer cancel()
 
 	d := inproc.New()
-	s := StreamCountStrategy{cs: make(map[string]*ctrConn)}
+	s := StreamCountStrategy{cs: make(map[string]*synctoolz.Var)}
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
