@@ -93,21 +93,21 @@ func TestStreamCountStrategy(t *testing.T) {
 	var conn pipe.Conn
 	t.Run("GetFresh", func(t *testing.T) {
 		var err error
-		var isNew bool
-		conn, isNew, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		var isCached bool
+		conn, isCached, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
-		assert.True(t, isNew)
+		assert.False(t, isCached)
 	})
 
 	t.Run("GetCached", func(t *testing.T) {
-		cached, isNew, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		cached, isCached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
 
-		assert.False(t, isNew)
+		assert.True(t, isCached)
 		assert.Equal(t, conn, cached)
 	})
 
