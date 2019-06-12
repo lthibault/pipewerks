@@ -67,7 +67,8 @@ func (ds *StreamCountStrategy) gc(addr string) func() {
 	}
 }
 
-// Track the connection. n should be set to the number of open streams on the connection
+// Track the connection. n should be set to the number of open streams on the connection.
+// It is intended to help DialStrategy implementers extend default behavior.
 func (ds *StreamCountStrategy) Track(conn pipe.Conn, n int) {
 	ds.mu.Lock()
 	ds.track(conn, n)
