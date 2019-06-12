@@ -72,7 +72,7 @@ func TestStreamCountStrategy(t *testing.T) {
 	defer cancel()
 
 	d := inproc.New()
-	s := streamCountStrategy{cs: make(map[string]*ctrConn)}
+	s := StreamCountStrategy{cs: make(map[string]*ctrConn)}
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
