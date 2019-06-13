@@ -3,11 +3,16 @@ package proto
 import pipe "github.com/lthibault/pipewerks/pkg"
 
 const (
+	// ConnStateOpen indicates the connection was opened
 	ConnStateOpen ConnState = iota
+	// ConnStateClosed indicates the connection was closed
 	ConnStateClosed
 
+	// StreamStateOpen indicates the stream was opened
 	StreamStateOpen StreamState = iota
+	// StreamStateIdle indicates the stream is unused
 	StreamStateIdle
+	// StreamStateClosed indicates the stream was closed
 	StreamStateClosed
 )
 
