@@ -8,7 +8,6 @@ import (
 
 	pipe "github.com/lthibault/pipewerks/pkg"
 	"github.com/lthibault/pipewerks/pkg/transport/inproc"
-	synctoolz "github.com/lthibault/toolz/pkg/sync"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,7 +72,7 @@ func TestStreamCountStrategy(t *testing.T) {
 	defer cancel()
 
 	d := inproc.New()
-	s := StreamCountStrategy{cs: make(map[string]*synctoolz.Var)}
+	s := NewStreamCountStrategy()
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
@@ -115,6 +114,11 @@ func TestStreamCountStrategy(t *testing.T) {
 	t.Run("EvictIdle", func(t *testing.T) {
 		conn.(*ctrConn).Incr() // simulate stream creation
 		conn.(*ctrConn).gc()   // decr and clear cache
+
+		// assert.NotContains will read the map; lock to avoid triggering race detector
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
 		assert.NotContains(t, s.cs, conn)
 	})
 }
