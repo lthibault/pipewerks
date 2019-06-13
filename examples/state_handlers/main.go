@@ -30,12 +30,12 @@ func server(l pipe.Listener) {
 				log.Fatal(err)
 			}
 		}),
-		ConnStateHandler: func(_ pipe.Conn, s proto.ConnState) {
+		ConnStateHandler: proto.ConnStateHandlerFunc(func(_ pipe.Conn, s proto.ConnState) {
 			log.Info(s)
-		},
-		StreamStateHandler: func(_ pipe.Stream, s proto.StreamState) {
+		}),
+		StreamStateHandler: proto.StreamStateHandlerFunc(func(_ pipe.Stream, s proto.StreamState) {
 			log.Info(s)
-		},
+		}),
 	}
 
 	log.Fatal(s.Serve(l))
