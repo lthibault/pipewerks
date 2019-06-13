@@ -2,6 +2,7 @@ package proto
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 
@@ -13,58 +14,72 @@ import (
 // StreamCountStrategy automatically closes connections when the stream count reaches
 // zero.
 type StreamCountStrategy struct {
-	mu sync.Mutex
-	cs map[string]*cacheDialer
+	init sync.Once
+	mu   sync.Mutex
+	cs   map[string]*cacheDialer
+
+	OnConnOpened func(pipe.Conn)
 }
 
-// NewStreamCountStrategy ...
-func NewStreamCountStrategy() *StreamCountStrategy {
-	return &StreamCountStrategy{cs: make(map[string]*cacheDialer)}
-}
-
-func (ds *StreamCountStrategy) gc(addr string) func() {
+func (s *StreamCountStrategy) gc(addr string) func() {
 	return func() {
-		ds.mu.Lock()
-		delete(ds.cs, addr)
-		ds.mu.Unlock()
+		s.mu.Lock()
+		delete(s.cs, addr)
+		s.mu.Unlock()
+	}
+}
+
+func (s *StreamCountStrategy) setup() {
+	if s.cs == nil {
+		s.cs = make(map[string]*cacheDialer)
+	}
+
+	if s.OnConnOpened == nil {
+		s.OnConnOpened = func(pipe.Conn) {}
 	}
 }
 
 // Track the connection. n should be set to the number of open streams on the connection.
 // It is intended to help DialStrategy implementers extend default behavior.
-func (ds *StreamCountStrategy) Track(conn pipe.Conn, n uint32) {
-	ds.mu.Lock()
-	defer ds.mu.Unlock()
+func (s *StreamCountStrategy) Track(conn pipe.Conn, n uint32) error {
+	s.init.Do(s.setup)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	key := conn.RemoteAddr().String()
-
-	d := &cacheDialer{gc: ds.gc(key)}
-	defer d.Do(func() {}) // disarm
-
-	ds.cs[key] = d
-	d.conn = &ctrConn{Conn: conn, Ctr: synctoolz.Ctr(n)}
-	ctx.Defer(conn.Context(), d.gc)
-}
-
-func (ds *StreamCountStrategy) getDialer(a net.Addr) (*cacheDialer, bool) {
-	ds.mu.Lock()
-	defer ds.mu.Unlock()
-
-	cd, ok := ds.cs[a.String()]
-	if !ok {
-		cd = &cacheDialer{gc: ds.gc(a.String())}
-		ds.cs[a.String()] = cd
+	if _, ok := s.cs[key]; ok {
+		return errors.New("already tracking")
 	}
 
-	return cd, ok
+	d := &cacheDialer{gc: s.gc(key)}
+	defer d.Do(func() {}) // disarm
+
+	s.cs[key] = d
+	d.conn = &ctrConn{Conn: conn, Ctr: synctoolz.Ctr(n)}
+	ctx.Defer(conn.Context(), d.gc)
+
+	return nil
+}
+
+func (s *StreamCountStrategy) getDialer(a net.Addr) *cacheDialer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cd, ok := s.cs[a.String()]
+	if !ok {
+		cd = &cacheDialer{gc: s.gc(a.String()), cb: s.OnConnOpened}
+		s.cs[a.String()] = cd
+	}
+
+	return cd
 }
 
 // GetConn returns an existing conn if one exists for the given address, else dials a
 // new connection.
-func (ds *StreamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (pipe.Conn, bool, error) {
-	cd, ok := ds.getDialer(a)
-	conn, err := cd.Dial(c, d, a)
-	return conn, ok, err
+func (s *StreamCountStrategy) GetConn(c context.Context, d PipeDialer, a net.Addr) (pipe.Conn, error) {
+	s.init.Do(s.setup)
+	return s.getDialer(a).Dial(c, d, a)
 }
 
 type cacheDialer struct {
@@ -72,6 +87,7 @@ type cacheDialer struct {
 	p PipeDialer
 
 	gc   func()
+	cb   func(pipe.Conn)
 	conn *ctrConn
 	err  error
 }
@@ -86,6 +102,7 @@ func (d *cacheDialer) Dial(c context.Context, p PipeDialer, a net.Addr) (*ctrCon
 
 		ctx.Defer(conn.Context(), d.gc)
 		d.conn = &ctrConn{Conn: conn}
+		d.cb(d.conn)
 	})
 
 	return d.conn, d.err

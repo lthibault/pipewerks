@@ -5,13 +5,13 @@ import pipe "github.com/lthibault/pipewerks/pkg"
 const (
 	// ConnStateOpen indicates the connection was opened
 	ConnStateOpen ConnState = iota
+	// ConnStateIdle indicates there are no active streams for this connection
+	ConnStateIdle
 	// ConnStateClosed indicates the connection was closed
 	ConnStateClosed
 
 	// StreamStateOpen indicates the stream was opened
 	StreamStateOpen StreamState = iota
-	// StreamStateIdle indicates the stream is unused
-	StreamStateIdle
 	// StreamStateClosed indicates the stream was closed
 	StreamStateClosed
 )
@@ -23,6 +23,8 @@ func (c ConnState) String() string {
 	switch c {
 	case ConnStateOpen:
 		return "connection open"
+	case ConnStateIdle:
+		return "connection idle"
 	case ConnStateClosed:
 		return "connection closed"
 	}
@@ -37,8 +39,6 @@ func (s StreamState) String() string {
 	switch s {
 	case StreamStateOpen:
 		return "stream open"
-	case StreamStateIdle:
-		return "stream idle"
 	case StreamStateClosed:
 		return "stream closed"
 	}

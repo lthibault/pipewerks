@@ -50,24 +50,26 @@ type Server struct {
 	StreamStateHandler
 }
 
+func (s *Server) setup() {
+	s.cq = make(chan struct{})
+	s.ls = &listenerSet{ls: make(map[*pipe.Listener]struct{}), mu: &s.mu}
+	s.cs = newConnSet()
+	if s.Logger == nil {
+		s.Logger = log.New(log.OptLevel(log.NullLevel))
+	}
+	if s.ConnStateHandler == nil {
+		s.ConnStateHandler = ConnStateHandlerFunc(func(pipe.Conn, ConnState) {})
+	}
+	if s.StreamStateHandler == nil {
+		s.StreamStateHandler = StreamStateHandlerFunc(func(pipe.Stream, StreamState) {})
+	}
+}
+
 // Serve streams.  Serve always returns a non-nil error and closes l.
 func (s *Server) Serve(l pipe.Listener) error {
 	// Start by doing some initialization.  A Server can listen on multiple interfaces
 	// at once, so setup needs to be idempotent.
-	s.init.Do(func() {
-		s.cq = make(chan struct{})
-		s.ls = &listenerSet{ls: make(map[*pipe.Listener]struct{}), mu: &s.mu}
-		s.cs = newConnSet()
-		if s.Logger == nil {
-			s.Logger = log.New(log.OptLevel(log.NullLevel))
-		}
-		if s.ConnStateHandler == nil {
-			s.ConnStateHandler = ConnStateHandlerFunc(func(pipe.Conn, ConnState) {})
-		}
-		if s.StreamStateHandler == nil {
-			s.StreamStateHandler = StreamStateHandlerFunc(func(pipe.Stream, StreamState) {})
-		}
-	})
+	s.init.Do(s.setup)
 
 	// There are two paths to closing a listener.  The first is by breaking out of the
 	// main server loop below.  The second is via a call to Close()/Shutdown(), which
@@ -102,20 +104,26 @@ func (s *Server) Serve(l pipe.Listener) error {
 			return e
 		}
 
-		go s.serveConn(conn)
+		go s.ServeConn(conn)
 	}
 }
 
-func (s *Server) serveConn(conn pipe.Conn) {
+// ServeConn handles incoming streams from a given connection.
+func (s *Server) ServeConn(conn pipe.Conn) {
+	s.init.Do(s.setup)
+
 	s.OnConnState(conn, ConnStateOpen)
 	defer s.OnConnState(conn, ConnStateClosed)
 
 	// Start by getting a reference counter for the stream.  Initially, the counter is
-	// set to zero.  When it reaches zero again, the stream will be closed.
+	// set to one.  Each incoming stream increments the counter by 1 and each stream
+	// closure decrements it by 1.  When the counter reaches 1 again, the connection
+	// will be marked idle (i.e. no active streams).  When it reaches zero, the
+	// connection will be closed.
 	ref := s.cs.Add(conn)
 
 	// Ensure the Conn is not closed until the client explicitly closed by the client
-	ctx.Defer(conn.Context(), func() { ref.Incr().Decr() })
+	ctx.Defer(conn.Context(), func() { ref.Decr() })
 
 	// Configure exponential backoff in case we hit temporary netowrk outages.
 	// TODO:  make this configurable (?)
@@ -139,20 +147,17 @@ func (s *Server) serveConn(conn pipe.Conn) {
 			return
 		}
 
-		go s.serveStream(stream, ref.Incr().Decr)
+		go s.serveStream(conn, stream, ref.Incr().Decr)
 	}
 }
 
-func (s *Server) serveStream(stream pipe.Stream, done func() uint32) {
+func (s *Server) serveStream(conn pipe.Conn, stream pipe.Stream, done func() uint32) {
 	s.OnStreamState(stream, StreamStateOpen)
+	defer s.OnStreamState(stream, StreamStateClosed)
+	defer stream.Close()
 	defer func() {
-		select {
-		case <-stream.Context().Done():
-			s.OnStreamState(stream, StreamStateClosed)
-		default:
-			if done() == 1 { // last ref is the Conn, else we'd be disconnected.
-				s.OnStreamState(stream, StreamStateIdle)
-			}
+		if done() == 1 { // last ref is the Conn, else we'd be disconnected.
+			s.OnConnState(conn, ConnStateIdle)
 		}
 	}()
 
@@ -286,7 +291,7 @@ func (set *connSet) Add(conn pipe.Conn) refCounter {
 	set.cs[conn] = c
 	set.mu.Unlock()
 
-	return c
+	return c.Incr()
 }
 
 func (set *connSet) gc(conn pipe.Conn) func() {

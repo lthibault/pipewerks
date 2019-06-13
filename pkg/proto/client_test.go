@@ -72,7 +72,7 @@ func TestStreamCountStrategy(t *testing.T) {
 	defer cancel()
 
 	d := inproc.New()
-	s := NewStreamCountStrategy()
+	s := &StreamCountStrategy{}
 
 	l, err := d.Listen(nil, inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
@@ -93,21 +93,27 @@ func TestStreamCountStrategy(t *testing.T) {
 	var conn pipe.Conn
 	t.Run("GetFresh", func(t *testing.T) {
 		var err error
-		var isCached bool
-		conn, isCached, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		var notCached bool
+
+		s.OnConnOpened = func(pipe.Conn) { notCached = true }
+
+		conn, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
-		assert.False(t, isCached)
+		assert.True(t, notCached)
 	})
 
 	t.Run("GetCached", func(t *testing.T) {
-		cached, isCached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
+		var notCached bool
+		s.OnConnOpened = func(pipe.Conn) { notCached = true }
+
+		cached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
 			t.FailNow()
 		}
 
-		assert.True(t, isCached)
+		assert.False(t, notCached)
 		assert.Equal(t, conn, cached)
 	})
 
