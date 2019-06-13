@@ -22,8 +22,8 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGi
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/lthibault/log v0.0.0-20190513014217-f549b3a28a20 h1:ac9vL01LlXB3jz6Rq3rYq7AOxbp3dSCYx9ogfXAV46U=
 github.com/lthibault/log v0.0.0-20190513014217-f549b3a28a20/go.mod h1:mkhKiE0tCpz+ChrbcLrpaDjng4Jb4EVFBDzez3cHdxY=
-github.com/lthibault/toolz v0.0.0-20190612191933-577bdb979795 h1:lO6HAkLuB4De0BOjRbcRJRK5R49rpiX8przOc8i1sTY=
-github.com/lthibault/toolz v0.0.0-20190612191933-577bdb979795/go.mod h1:zUzFMc0Z5KereQ+2WLdswr5B9WDy2t11mOjw7x3Nx6c=
+github.com/lthibault/toolz v0.0.0-20190613123839-0a7d14f0fcab h1:pkdhn24KoeFo0oI3FLqjDSxgfglUGQGH7gzZ5rIJewg=
+github.com/lthibault/toolz v0.0.0-20190613123839-0a7d14f0fcab/go.mod h1:O3Lhv3IMtkW9ZPQT9Pc/bCxsbUYjbHUqnZI5gMy0ICw=
 github.com/lucas-clemente/quic-go v0.11.2 h1:Mop0ac3zALaBR3wGs6j8OYe/tcFvFsxTUFMkE/7yUOI=
 github.com/lucas-clemente/quic-go v0.11.2/go.mod h1:PpMmPfPKO9nKJ/psF49ESTAGQSdfXxlg1otPbEB2nOw=
 github.com/marten-seemann/qtls v0.2.3 h1:0yWJ43C62LsZt08vuQJDK1uC1czUc3FJeCLPoNAI4vA=

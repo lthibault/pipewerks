@@ -124,28 +124,59 @@ func TestStreamCountStrategy(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
-	d := inproc.New()
-	c := &Client{Dialer: d}
+	t.Run("Integration", func(t *testing.T) {
+		d := inproc.New()
+		c := &Client{Dialer: d}
 
-	l, err := d.Listen(nil, inproc.Addr("/test"))
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-	defer l.Close()
+		l, err := d.Listen(nil, inproc.Addr("/test"))
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
+		defer l.Close()
 
-	var s Server
-	s.Handler = HandlerFunc(func(s pipe.Stream) {
-		defer s.Close()
-		s.Write([]byte("hello"))
+		var s Server
+		s.Handler = HandlerFunc(func(s pipe.Stream) {
+			defer s.Close()
+			s.Write([]byte("hello"))
+		})
+		go s.Serve(l)
+
+		t.Run("Sync", func(t *testing.T) {
+			stream, err := c.Connect(context.Background(), inproc.Addr("/test"))
+			if !assert.NoError(t, err) {
+				t.FailNow()
+			}
+
+			b := new(bytes.Buffer)
+			io.Copy(b, stream)
+			assert.Equal(t, "hello", b.String())
+		})
+
+		t.Run("Async", func(t *testing.T) {
+			t.Parallel()
+
+			go t.Run("0", func(t *testing.T) {
+				stream, err := c.Connect(context.Background(), inproc.Addr("/test"))
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
+
+				b := new(bytes.Buffer)
+				io.Copy(b, stream)
+				assert.Equal(t, "hello", b.String())
+			})
+
+			go t.Run("1", func(t *testing.T) {
+				stream, err := c.Connect(context.Background(), inproc.Addr("/test"))
+				if !assert.NoError(t, err) {
+					t.FailNow()
+				}
+
+				b := new(bytes.Buffer)
+				io.Copy(b, stream)
+				assert.Equal(t, "hello", b.String())
+			})
+
+		})
 	})
-	go s.Serve(l)
-
-	stream, err := c.Connect(context.Background(), inproc.Addr("/test"))
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-
-	b := new(bytes.Buffer)
-	io.Copy(b, stream)
-	assert.Equal(t, "hello", b.String())
 }

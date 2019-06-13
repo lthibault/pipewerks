@@ -7,7 +7,7 @@ require (
 	github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d
 	github.com/jpillora/backoff v0.0.0-20180909062703-3050d21c67d7
 	github.com/lthibault/log v0.0.0-20190513014217-f549b3a28a20
-	github.com/lthibault/toolz v0.0.0-20190612191933-577bdb979795
+	github.com/lthibault/toolz v0.0.0-20190613123839-0a7d14f0fcab
 	github.com/lucas-clemente/quic-go v0.11.2
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2 // indirect
