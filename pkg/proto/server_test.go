@@ -13,7 +13,7 @@ import (
 
 var d = inproc.New()
 
-func TestServer(t *testing.T) {
+func TestServerIntegration(t *testing.T) {
 	l, err := d.Listen(context.Background(), inproc.Addr("/test"))
 	if !assert.NoError(t, err) {
 		t.FailNow()
