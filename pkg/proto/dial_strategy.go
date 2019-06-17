@@ -18,7 +18,7 @@ type StreamCountStrategy struct {
 	mu   sync.Mutex
 	cs   map[string]*cacheDialer
 
-	OnConnOpened func(pipe.Conn)
+	OnConnOpened func(pipe.Conn) error
 }
 
 func (s *StreamCountStrategy) gc(addr string) func() {
@@ -35,7 +35,7 @@ func (s *StreamCountStrategy) setup() {
 	}
 
 	if s.OnConnOpened == nil {
-		s.OnConnOpened = func(pipe.Conn) {}
+		s.OnConnOpened = func(pipe.Conn) error { return nil }
 	}
 }
 
@@ -87,7 +87,7 @@ type cacheDialer struct {
 	p PipeDialer
 
 	gc   func()
-	cb   func(pipe.Conn)
+	cb   func(pipe.Conn) error
 	conn *ctrConn
 	err  error
 }
@@ -100,9 +100,14 @@ func (d *cacheDialer) Dial(c context.Context, p PipeDialer, a net.Addr) (*ctrCon
 			return
 		}
 
-		ctx.Defer(conn.Context(), d.gc)
+		if d.err = d.cb(d.conn); d.err != nil {
+			d.conn.Close() // will call gc
+			d.gc()
+			return
+		}
+
 		d.conn = &ctrConn{Conn: conn}
-		d.cb(d.conn)
+		ctx.Defer(conn.Context(), d.gc)
 	})
 
 	return d.conn, d.err

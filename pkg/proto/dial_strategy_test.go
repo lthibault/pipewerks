@@ -59,7 +59,10 @@ func TestStreamCountStrategy(t *testing.T) {
 		var err error
 		var notCached bool
 
-		s.OnConnOpened = func(pipe.Conn) { notCached = true }
+		s.OnConnOpened = func(pipe.Conn) error {
+			notCached = true
+			return nil
+		}
 
 		conn, err = s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
@@ -70,7 +73,10 @@ func TestStreamCountStrategy(t *testing.T) {
 
 	t.Run("GetCached", func(t *testing.T) {
 		var notCached bool
-		s.OnConnOpened = func(pipe.Conn) { notCached = true }
+		s.OnConnOpened = func(pipe.Conn) error {
+			notCached = true
+			return nil
+		}
 
 		cached, err := s.GetConn(context.Background(), d, inproc.Addr("/test"))
 		if !assert.NoError(t, err) {
