@@ -7,7 +7,7 @@ import (
 )
 
 // DefaultNamespace is a global namespace that is used by default
-var DefaultNamespace Namespace = make(BasicNamespace)
+var DefaultNamespace Namespace = make(namespace)
 
 // Connector can wait for incoming connections
 type Connector interface {
@@ -21,11 +21,9 @@ type Namespace interface {
 	Free(string)
 }
 
-// BasicNamespace is the implementation used by DefaultNamespace.
-type BasicNamespace map[string]Connector
+type namespace map[string]Connector
 
-// Bind a connector to an address.
-func (n BasicNamespace) Bind(addr string, c Connector) bool {
+func (n namespace) Bind(addr string, c Connector) bool {
 	if _, ok := n[addr]; ok {
 		return false
 	}
@@ -34,11 +32,9 @@ func (n BasicNamespace) Bind(addr string, c Connector) bool {
 	return true
 }
 
-// GetConnector at specified address.  ok is false if no connector is bound.
-func (n BasicNamespace) GetConnector(addr string) (c Connector, ok bool) {
+func (n namespace) GetConnector(addr string) (c Connector, ok bool) {
 	c, ok = n[addr]
 	return
 }
 
-// Free the address by removing its connector.
-func (n BasicNamespace) Free(addr string) { delete(n, addr) }
+func (n namespace) Free(addr string) { delete(n, addr) }

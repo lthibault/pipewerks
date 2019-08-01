@@ -87,7 +87,7 @@ func dialTest(c context.Context, t *testing.T, wg *sync.WaitGroup, tp pipe.Trans
 }
 
 func TestItegration(t *testing.T) {
-	tp := New(OptNamespace(make(BasicNamespace)))
+	tp := New(OptNamespace(make(namespace)))
 	c := context.Background()
 
 	l, err := tp.Listen(c, Addr("/test"))
@@ -105,7 +105,7 @@ func TestItegration(t *testing.T) {
 var res = make([]byte, 5)
 
 func BenchmarkTransmission(b *testing.B) {
-	t := New(OptNamespace(make(BasicNamespace)))
+	t := New(OptNamespace(make(namespace)))
 
 	l, err := t.Listen(context.Background(), Addr("/bench"))
 	if err != nil {
