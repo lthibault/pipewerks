@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const network = "inproc"
+
 // ReverseDialer can provide a dialback address
 type ReverseDialer interface {
 	Dialback() Addr
@@ -18,7 +20,7 @@ type ReverseDialer interface {
 type Addr string
 
 // Network satisfies net.Addr
-func (Addr) Network() string  { return "inproc" }
+func (Addr) Network() string  { return network }
 func (a Addr) String() string { return string(a) }
 
 // Transport bytes around the process
@@ -40,7 +42,7 @@ func (t *Transport) Listen(_ context.Context, a net.Addr) (pipe.Listener, error)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if a.Network() != "inproc" {
+	if a.Network() != network {
 		return nil, errors.Errorf("inproc: invalid network %s", a.Network())
 	}
 
@@ -57,7 +59,7 @@ func (t *Transport) Dial(c context.Context, a net.Addr) (pipe.Conn, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	if a.Network() != "inproc" {
+	if a.Network() != network {
 		return nil, errors.Errorf("inproc: invalid network %s", a.Network())
 	}
 
