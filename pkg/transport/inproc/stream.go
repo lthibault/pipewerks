@@ -27,3 +27,11 @@ func (s stream) Close() error {
 type addrWrapper struct{ net.Addr }
 
 func (addrWrapper) Network() string { return network }
+
+func (a addrWrapper) String() string {
+	if a.Addr.String() == "pipe" {
+		return ""
+	}
+
+	return a.Addr.String()
+}
